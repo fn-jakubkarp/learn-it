@@ -13,7 +13,8 @@ export interface CardState {
 
 export interface CardRow extends CardState {
 	id: number;
-	topic_id: number;
+	concept_id: number;
+	subject_id: number;
 	question: string;
 	answer: string;
 	next_review: string;
@@ -53,15 +54,15 @@ export function schedule(card: CardState, quality: number): CardState {
 	return { interval, ease_factor, repetitions };
 }
 
-export function getDueCards(db: Database, topicName?: string): CardRow[] {
+export function getDueCards(db: Database, subjectName?: string): CardRow[] {
 	const now = today();
-	if (topicName) {
+	if (subjectName) {
 		return db
 			.query(
-				`SELECT f.* FROM flashcards f JOIN topics t ON f.topic_id = t.id
-         WHERE t.name = ? AND f.next_review <= ? ORDER BY f.next_review ASC`,
+				`SELECT f.* FROM flashcards f JOIN subjects s ON f.subject_id = s.id
+         WHERE s.name = ? AND f.next_review <= ? ORDER BY f.next_review ASC`,
 			)
-			.all(topicName, now) as CardRow[];
+			.all(subjectName, now) as CardRow[];
 	}
 	return db
 		.query(
@@ -94,8 +95,15 @@ export function gradeCard(db: Database, cardId: number, quality: number) {
 	// Log the recall. interval_before is the gap this card just survived — the
 	// proof that mastery scoring relies on (see src/mastery.ts).
 	db.run(
-		"INSERT INTO reviews (card_id, topic_id, quality, interval_before, interval_after) VALUES (?, ?, ?, ?, ?)",
-		[cardId, card.topic_id, quality, card.interval, next.interval],
+		"INSERT INTO reviews (card_id, concept_id, subject_id, quality, interval_before, interval_after) VALUES (?, ?, ?, ?, ?, ?)",
+		[
+			cardId,
+			card.concept_id,
+			card.subject_id,
+			quality,
+			card.interval,
+			next.interval,
+		],
 	);
 
 	return { ...card, ...next, next_review: nextReview };
