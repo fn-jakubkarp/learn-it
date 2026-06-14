@@ -1,122 +1,131 @@
 ---
 name: learn-it
-description: Cognitive learning engine -- a set of stages (diagnose, conceptualize, anchor, recall, space, verify) plus a watcher that tracks many topics at once and an SM-2 spaced-repetition scheduler. Tools, not rails.
+description: Cognitive learning engine -- subjects broken into concepts, a watcher that tracks many subjects at once, an SM-2 scheduler, and harsh per-subject mastery scored from logged performance. Tools, not rails.
 arguments: stage
 user_invocable: true
-argument-hint: "[ (no args = resume) | init | plan | concept | anchor | extract | review | feynman | exam | assess | mastery ]"
+argument-hint: "[ (no args = resume) | init | explore-topic | explore-gaps | plan | concept | anchor | extract | review | feynman | exam | assess | evaluate | mastery ]"
 ---
 
 # learn-it -- Session Router
 
-Learn-it gives the learner **proper tools and a watcher**, not a railroad. The
-phases (`diagnose -> conceptualize -> anchor -> recall -> space -> verify ->
-mastered`) are a **map**, not a locked sequence. The learner can:
+Learn-it gives the learner **proper tools and a watcher**, not a railroad.
 
-- run **several topics at once**, each at its own phase;
+**Structure (2-tier):** a **subject** is the thing you master ("Rust", "Networking") — it carries the roadmap, the phase, and the Dreyfus mastery tier. A **concept** is a lesson-sized leaf under it ("ownership", "IP address types") — cards attach to concepts; a concept is retained-or-not, it has no tier of its own. The roadmap IS the concept list.
+
+The phases (`diagnose -> conceptualize -> anchor -> recall -> space -> verify -> mastered`) are a **map**, not a locked sequence. The learner can:
+
+- run **several subjects at once**, each at its own phase;
 - run **any stage on demand** — nothing is blocked;
-- interleave review across all topics (that is how spaced repetition works).
+- interleave review across all subjects (that is how spaced repetition works).
 
-A topic's phase is **inferred** from what the learner has actually produced
-(audit filled? roadmap? cards? reviews?) — never set by hand. The `stages/`
-prompts say how to run each stage.
+A subject's phase is **inferred** from real state (audit filled? concepts planned? cards? reviews?) — never set by hand. The `stages/` prompts say how to run each stage.
 
 ## Mandatory Context
 
-Before anything, resume to see every topic's phase and what is due today:
-
 ```bash
-bun src/learn-it.ts            # dashboard: all topics + phase + due + suggested next
+bun src/learn-it.ts            # dashboard: every subject, its tier, phase, due count
 ```
 
 ## The watcher (advise, never block)
 
-Before running a stage, ask the watcher whether it fits. It **never refuses** —
-it prints `OK` or a `NOTE` nudge:
-
 ```bash
-bun src/learn-it.ts advise {stage} "{topic}"   # "OK (phase: ...)" or "NOTE: <nudge>"
+bun src/learn-it.ts advise {stage} "{subject}"   # "OK (phase: ...)" or "NOTE: <nudge>"
 ```
 
-If it returns a `NOTE`, surface it to the learner ("you have 0 reviews — an exam
-now tests little"), then **honor their choice**. They decide; you inform. There
-is no `advance` — phase follows reality on its own.
+It **never refuses**. On a `NOTE`, surface it ("you have 0 reviews — an exam now tests little"), then **honor the learner's choice**. There is no `advance` — phase follows reality.
+
+## Diagnose before you teach (placement, not self-report)
+
+A learner can't list what they don't know, and an experienced learner shouldn't start at novice. So after `init`, **don't trust the audit** — explore:
+
+1. **explore-topic** — map the subject into concepts (`addconcept`), so even unnamed gaps are on the map.
+2. **explore-gaps** — *test* the learner across that map at rising difficulty and record concept-level evidence with `probe`. A passing probe marks a concept proven and lifts the learner to their real level — up to **proficient** (expert still needs a build + durability over time).
+
+```bash
+bun src/learn-it.ts probe "{subject}" "{concept}" <explain|apply> {0-100}
+bun src/learn-it.ts target "{subject}" <competent|proficient|expert>   # what they're aiming for
+```
+
+Set a `target` for upskillers so `mastery` focuses on the gap between where they are and where they want to be, instead of re-teaching what they already know.
 
 ## Home assessment (always actionable)
 
-Never hand back "review 5 cards." Pull the inputs, then design ONE concrete,
-varied task that targets the learner's weak spots:
+Never hand back "review 5 cards." Issue a structured task from a template, then design the *content* to hit the learner's weak spots:
 
 ```bash
-bun src/learn-it.ts assess ["{topic}"]    # weakest due cards, phase, next-tier gap
+bun src/learn-it.ts assess "{subject}" [explain|apply|build]
 ```
 
-`assess` reports the lowest-ease (hardest) due cards, the topic's phase, and the
-single thing blocking the next mastery tier. Turn that into a generative task
-matched to the phase — explain *why* without notes, apply it to a new problem,
-debug a broken example, teach it back. Vary it day to day (desirable
-difficulties); recognition is not recall.
+`assess` copies the right template into `subjects/{subject}/assessments/{date}-{kind}.md` (kind defaults from the phase) and reports the weakest cards + the next-tier gap. **Fill in the `## Task` section** of that file with a concrete, varied prompt — explain *why* from memory, apply it to a NEW problem, debug a broken example, or (milestone) build something real. Keep the file's structure; only the question is yours. The learner writes their answer into the file.
+
+## Evaluate (turn a submission into evidence)
+
+After the learner submits, grade it **against the rubric template** and record it:
+
+```bash
+bun src/learn-it.ts evaluate "{subject}" <explain|apply|build> <score 0-100> [file]
+```
+
+Score each rubric dimension (see `templates/rubric/{kind}.md`) — do not invent your own scale. `>= 70` passes. This logs evidence that feeds mastery; a passing **build** is required to reach expert.
 
 ## Mastery & rewards (earned, harsh, honest)
 
-Mastery is computed in the database from logged performance — it cannot be
-self-reported, so it cannot be gamed. Tiers follow the Dreyfus ladder
-(novice -> advanced-beginner -> competent -> proficient -> expert) and are
-**brutal by design**: volume never lifts a tier; only proven retention (cards
-recalled after long gaps) and verification (exams, teach-backs) do.
+Mastery is computed in the database from logged performance (`reviews` + `evidence`) — never self-reported, so it cannot be gamed. Tiers follow the Dreyfus ladder and are **brutal by design**: volume never lifts a tier. Climbing needs proven retention (concepts recalled after long gaps) and higher-Bloom evidence — and **expert is unreachable without a real build**.
 
 ```bash
-bun src/learn-it.ts mastery "{topic}"     # tier, % to next tier, exactly what's blocking
+bun src/learn-it.ts mastery "{subject}"     # tier, % to next tier, exactly what's blocking
 ```
 
-**Reward = informational, never currency.** When the learner clears a real
-milestone — a tier-up, a card surviving a long interval, a passed exam — name
-the genuine achievement ("you recalled this cold after 30 days — that's durable
-long-term memory"). Do NOT invent points, badges, or streak pressure; the felt
-sense of growing competence is the reward. A tier-up is rare and worth marking.
+**Reward = informational, never currency.** Name genuine milestones — a concept surviving 30 days, an apply assessment passed, a tier earned ("you recalled this cold after 30 days — durable long-term memory"). No points, badges, or streak pressure. A tier-up is rare and worth marking.
 
 ## Stages
 
 ### (no args) -- resume
-- **Action**: `bun src/learn-it.ts`
-- **Response**: Show the dashboard across all topics; point each at its suggested next stage.
+- **Action**: `bun src/learn-it.ts` → dashboard across all subjects.
 
-### /learn-it init {topic}
-- **Action**: `bun src/learn-it.ts init "{topic}"`
-- **Response**: Confirm `topics/{topic}/audit.md` is ready for the learner to fill.
+### /learn-it init {subject}
+- **Action**: `bun src/learn-it.ts init "{subject}"`. Confirm `subjects/{subject}/audit.md` is ready to fill.
 
-### /learn-it plan {topic}
-- **Action**: Read `stages/plan.md` and `topics/{topic}/audit.md`. Generate `topics/{topic}/roadmap.md`. (run `advise plan` first; an empty audit only earns a nudge, not a block.)
-- **Response**: Present the chunked roadmap.
+### /learn-it explore-topic {subject}
+- **Action**: Read `stages/explore-topic.md`. Map the subject into concepts and register them (`addconcept`); write the map to `roadmap.md`. Refines the audit rather than trusting it.
 
-### /learn-it concept {term}
-- **Action**: Read `stages/concept.md`. Explain via analogy and mechanism (no dry definitions). Append insights to `topics/{topic}/notes.md`.
+### /learn-it explore-gaps {subject}
+- **Action**: Read `stages/explore-gaps.md`. Probe the learner across the concepts at rising difficulty; record each with `probe` (places them at their real level, up to proficient). Write calibrated findings to `audit.md`; optionally set a `target`.
 
-### /learn-it anchor {facts}
-- **Action**: Read `stages/anchor.md`. Build mnemonics (palace / acronym / story) for the raw facts.
-
-### /learn-it extract {topic}
-- **Action**: Read `stages/extract.md`. Turn notes + mnemonics into Q/A pairs and load each one:
+### /learn-it plan {subject}
+- **Action**: Read `stages/plan.md` + `subjects/{subject}/audit.md`. Write `subjects/{subject}/roadmap.md`, then **register every roadmap leaf as a concept** (coverage and mastery measure against these):
   ```bash
-  bun src/learn-it.ts addcard "{topic}" "{question}" "{answer}"
+  bun src/learn-it.ts addconcept "{subject}" "{concept}"
   ```
 
-### /learn-it review [topic]
-- **Action**: Read `stages/review.md`. With no topic the queue interleaves every topic's due cards. Present one at a time, grade the learner's typed answer 0-5:
+### /learn-it concept {term}
+- **Action**: Read `stages/concept.md`. Explain via analogy and mechanism (no dry definitions). Append insights to `subjects/{subject}/notes.md`.
+
+### /learn-it anchor {facts}
+- **Action**: Read `stages/anchor.md`. Build mnemonics (palace / acronym / story) for raw facts.
+
+### /learn-it extract {subject}
+- **Action**: Read `stages/extract.md`. Turn notes + mnemonics into Q/A pairs, each tied to a concept:
   ```bash
-  bun src/learn-it.ts due ["{topic}"]          # due cards (all topics if omitted)
-  bun src/learn-it.ts grade {cardId} {0-5}     # apply SM-2, reschedule
+  bun src/learn-it.ts addcard "{subject}" "{concept}" "{question}" "{answer}"
+  ```
+
+### /learn-it review [subject]
+- **Action**: Read `stages/review.md`. With no subject the queue interleaves every subject's due cards. One at a time, grade the typed answer 0-5:
+  ```bash
+  bun src/learn-it.ts due ["{subject}"]
+  bun src/learn-it.ts grade {cardId} {0-5}
   ```
 - **Rule**: the learner must type a full answer. No "I know this" shortcuts.
 
-### /learn-it feynman {topic}
-- **Action**: Read `stages/feynman.md`. Reverse roles: the learner teaches, you play the confused novice and probe gaps. Score the teach-back 0-100 and record it (depth signal):
+### /learn-it feynman {subject}
+- **Action**: Read `stages/feynman.md`. Reverse roles: the learner teaches, you play the novice and probe gaps. Record it as explain evidence:
   ```bash
-  bun src/learn-it.ts verify "{topic}" feynman {0-100}
+  bun src/learn-it.ts evaluate "{subject}" explain {0-100}
   ```
 
-### /learn-it exam {topic}
-- **Action**: Read `stages/exam.md`. Run a hard, timed/scored test. Record the score (it feeds mastery; a high score can lift the topic to `expert`):
+### /learn-it exam {subject}
+- **Action**: Read `stages/exam.md`. Run a hard, scored test on a NEW problem. Record it as apply evidence, then report mastery:
   ```bash
-  bun src/learn-it.ts verify "{topic}" exam {0-100}    # >= 70 passes; >= 90 needed for expert
+  bun src/learn-it.ts evaluate "{subject}" apply {0-100}    # >= 90 needed toward expert
   ```
-- After recording, run `mastery "{topic}"` and tell the learner where they now stand.
