@@ -91,5 +91,12 @@ export function gradeCard(db: Database, cardId: number, quality: number) {
 		[next.interval, next.ease_factor, next.repetitions, nextReview, cardId],
 	);
 
+	// Log the recall. interval_before is the gap this card just survived — the
+	// proof that mastery scoring relies on (see src/mastery.ts).
+	db.run(
+		"INSERT INTO reviews (card_id, topic_id, quality, interval_before, interval_after) VALUES (?, ?, ?, ?, ?)",
+		[cardId, card.topic_id, quality, card.interval, next.interval],
+	);
+
 	return { ...card, ...next, next_review: nextReview };
 }
