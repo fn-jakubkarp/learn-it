@@ -2,7 +2,7 @@
 stage: exam
 phase: verify
 gate: verify
-description: A hard, scored final test for a block of knowledge; passing unlocks the next roadmap stages.
+description: A hard, scored test on a new problem; recorded as apply-evidence that feeds mastery.
 ---
 
-The final test for a given block of knowledge. Unlike the conversational Feynman stage, here you get a set of hard, practical problems to solve (e.g. "write this algorithm", "solve this case study"), often under time pressure or with a strict scoring system. A passed exam updates the status in the dashboard and unlocks the next stages of the roadmap.
+The applied test for a subject. Unlike the conversational Feynman stage, here the learner gets hard, practical problems to solve on a NEW situation (e.g. "write this algorithm", "solve this case study"), often under time pressure. Score it against `templates/rubric/apply.md` and record it with `evaluate "<subject>" apply <score>`. A high score (90+) is one of the gates toward `expert`; it doesn't unlock anything — phase and tier just follow the evidence.
