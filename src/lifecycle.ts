@@ -26,12 +26,13 @@ export interface TopicSignals {
 	cardCount: number;
 	reviewedCount: number; // cards recalled at least once
 	maturedCount: number; // cards settled into long-term (interval >= 7d)
+	hasAppliedEvidence: boolean; // passed an apply/build assessment or probe
 	mastered: boolean;
 }
 
 // The stage(s) to suggest when a topic sits at a given phase.
 export const PHASE_SUGGESTION: Record<Phase, string> = {
-	diagnose: "plan",
+	diagnose: "explore-topic / explore-gaps, then plan",
 	conceptualize: "concept / anchor / extract",
 	anchor: "anchor / extract",
 	recall: "review",
@@ -43,6 +44,8 @@ export const PHASE_SUGGESTION: Record<Phase, string> = {
 // The phase a stage primarily belongs to (used only to phrase advice).
 const STAGE_PHASE: Record<string, Phase> = {
 	init: "diagnose",
+	"explore-topic": "diagnose",
+	"explore-gaps": "diagnose",
 	plan: "diagnose",
 	concept: "conceptualize",
 	anchor: "anchor",
@@ -61,6 +64,9 @@ export function inferPhase(s: TopicSignals): Phase {
 	if (s.mastered) return "mastered";
 	if (!s.auditFilled) return "diagnose";
 	if (!s.hasRoadmap) return "diagnose"; // audit done, plan is the next move
+	// Demonstrated application (e.g. an upskiller placed by the diagnostic) is a
+	// verify-level signal regardless of how many cards exist.
+	if (s.hasAppliedEvidence) return "verify";
 	if (s.cardCount === 0) return "conceptualize"; // building understanding, no cards yet
 	if (s.reviewedCount === 0) return "recall"; // cards exist, start retrieving
 	if (s.maturedCount < s.cardCount) return "space"; // some still settling
