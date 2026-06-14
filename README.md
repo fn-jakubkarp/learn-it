@@ -46,18 +46,29 @@ Learn-it is built around a 6-step framework based on how the human brain natural
 Learn-it keeps three concerns apart so the engine never overwrites your thinking, and so your progress always has a single source of truth.
 
 **Knowledge — you author, the engine only reads:**
-- `topics/{topic}/audit.md` — your knowledge-gap self-assessment.
-- `topics/{topic}/notes.md` — your explanations and conceptual links.
-- `topics/{topic}/roadmap.md` — the study plan you agreed to.
+- `subjects/{subject}/audit.md` — your knowledge-gap self-assessment.
+- `subjects/{subject}/notes.md` — your explanations and conceptual links.
+- `subjects/{subject}/roadmap.md` — the study plan you agreed to.
+- `subjects/{subject}/assessments/*.md` — issued tasks + your submissions.
 
 **State — the engine owns this; don't hand-edit:**
-- `data/learn_it.db` — the source of truth for scheduling and card intervals. (Each topic's *phase* isn't stored here — it's inferred from your Knowledge + State.)
+- `data/learn_it.db` — the source of truth for cards, the recall log, and mastery evidence. (A subject's *phase* and *tier* aren't stored — they're computed from your Knowledge + State, so they can't be faked.)
 
 **Engine — versioned logic and prompts:**
 - `stages/*.md` — the instructions for each learning stage.
-- `src/*.ts` — router, scheduler, and SQLite bridge.
+- `templates/*` — fixed assessment + rubric structures (so scoring doesn't drift).
+- `src/*.ts` — router, scheduler, mastery, and SQLite bridge.
 
 **The one rule:** the engine writes *State*, reads *Knowledge*, and never edits a file you authored.
+
+## 🧱 Subjects & concepts (2-tier)
+
+"Topic" is two different sizes of thing, so Learn-it splits them:
+
+- **Subject** — the thing you *master*: "Rust", "Computer Networking". Carries the roadmap, the phase, and the **mastery tier**.
+- **Concept** — a lesson-sized leaf under a subject: "ownership", "IP address types". Cards attach here. A concept is *retained-or-not* — it has no tier.
+
+The **roadmap is the concept list**, and mastery rolls up from it. So *"types of IP addresses"* isn't a subject you become "expert" in — it's a concept under the *Networking* subject. You can't become an expert in a single fact.
 
 ## 🔄 The Learning Map (not a railroad)
 
@@ -68,60 +79,79 @@ diagnose → conceptualize → anchor → recall → space → verify → master
 ```
 
 - **Run any stage on demand.** Nothing is blocked. If you jump ahead, the watcher *nudges* ("you've reviewed 0 cards — an exam now tests little") and lets you decide.
-- **Phase is inferred, never set by hand.** Learn-it reads your real state — audit filled? roadmap written? cards made? cards reviewed? — and works out where each topic sits. No cursor to advance, nothing to desync.
-- **Many topics at once.** Run Rust, networking, and cooking in parallel; each sits at its own phase. The review queue interleaves due cards across all of them — which is exactly how spaced repetition is supposed to work.
+- **Phase is inferred, never set by hand.** Learn-it reads your real state — audit filled? concepts planned? cards made? cards reviewed? — and works out where each subject sits. No cursor to advance, nothing to desync.
+- **Many subjects at once.** Run Rust, networking, and cooking in parallel; each sits at its own phase. The review queue interleaves due cards across all of them — which is exactly how spaced repetition is supposed to work.
 
 | Phase | Suggested stage | What happens |
 |-------|-----------------|--------------|
-| `diagnose` | `init`, `plan` | Audit your gaps; turn the audit into a roadmap. |
+| `diagnose` | `init`, `plan` | Audit your gaps; turn the audit into a roadmap of concepts. |
 | `conceptualize` | `concept` | Build the big picture by analogy and mechanism. |
 | `anchor` | `anchor`, `extract` | Glue raw facts with mnemonics; extract them into cards. |
 | `recall` / `space` | `review` | The scheduler quizzes you on due cards and reschedules. |
-| `verify` | `feynman`, `exam` | Teach it back; pass a hard test to reach `mastered`. |
+| `verify` | `feynman`, `exam` | Teach it back; pass hard assessments to reach `mastered`. |
 
 ## 🏅 Mastery (earned, harsh, honest)
 
-Each topic has a **mastery tier** on the Dreyfus ladder — and it's deliberately hard to climb, because real expertise is. Knowing how to write a `for` loop makes you a *novice*, full stop.
+Each **subject** has a **mastery tier** on the Dreyfus ladder — deliberately hard to climb, because real expertise is. Knowing how to write a `for` loop makes you a *novice*, full stop.
 
 ```
 novice → advanced-beginner → competent → proficient → expert
 ```
 
-- **You cannot grind your way up.** Volume — more cards, more reviews, more hours — never lifts a tier on its own. Climbing requires **proven retention** (recalling a card correctly *after a long gap*, not the same day) and **verification** (passing a hard exam, teaching it back). 100 cards with zero retention? Still advanced-beginner.
-- **The score is un-gameable.** Mastery is computed in the database from an append-only log of what you actually did — every graded recall, every exam. It is never self-reported, so you can't edit a file to fake it. (Gaming your own score *is* the illusion of competence — the thing this whole tool exists to defeat.)
-- **The watcher actively helps you get there.** `mastery` tells you the single thing blocking your next tier; the daily assessment targets your weakest cards toward it.
+- **You cannot grind your way up.** Volume — more cards, more reviews, more hours — never lifts a tier. Climbing needs **proven retention** (recalling a concept *after a long gap*, not the same day) and **evidence that isn't flashcards**: explaining it, applying it to new problems, and — for expert — **building something real**. 100 cards with zero retention? Still advanced-beginner.
+- **Flashcards are one stream, not the score.** Mastery is medium-agnostic. A passing *build* is required to reach expert; cards + exams alone cap you at proficient. So someone who ships real work ranks high; someone with a thousand cards and no application does not.
+- **The score is un-gameable.** It's computed from an append-only log of what you actually did — every graded recall, every assessment scored against a fixed rubric. Never self-reported, so editing a file can't fake it. (Gaming your own score *is* the illusion of competence — the thing this tool exists to defeat. And a chat CLI can't watch you study, so it only ever credits what you *demonstrate to it*.)
+- **You don't always start at novice.** A diagnostic (`explore-topic` maps the subject; `explore-gaps` *tests* you across it) places you at your real level — so a senior upskilling doesn't grind through what they already know. Placement is still **earned, not declared**: you only rise by demonstrating it in the probe. A single diagnostic can reach up to **proficient**; expert still demands a build + durability over time.
+- **The watcher helps you get there.** Set a `target` tier and `mastery` focuses on the gap to it; `assess` issues a structured task aimed at the one thing blocking your next step.
 
 ```bash
-bun src/learn-it.ts mastery "rust-ownership"   # tier, % to next tier, what's blocking
-bun src/learn-it.ts assess  "rust-ownership"   # today's actionable focus (weakest first)
+bun src/learn-it.ts probe   "rust" "ownership" apply 85   # diagnostic: place at real level
+bun src/learn-it.ts target  "rust" expert                 # what you're aiming for
+bun src/learn-it.ts mastery "rust"                         # tier, gap to target, what's blocking
+bun src/learn-it.ts assess  "rust" apply                   # issue an assessment from a template
+bun src/learn-it.ts evaluate "rust" apply 85               # grade a submission → logged evidence
 ```
 
-**Rewards are informational, not currency.** No points, badges, or streak pressure — those quietly replace *wanting to understand* with *wanting the number to go up*. Instead, the system names genuine milestones: a card surviving 30 days, an exam passed, a tier earned. A tier-up is rare, and it's supposed to feel like one.
+**Rewards are informational, not currency.** No points, badges, or streak pressure — those quietly replace *wanting to understand* with *wanting the number to go up*. Instead, the system names genuine milestones: a concept surviving 30 days, an assessment passed, a tier earned. A tier-up is rare, and it's supposed to feel like one.
+
+## 📝 Assessments (structured, not improvised)
+
+Home assessments aren't "review 5 cards," and they aren't freely improvised by the AI — that would make scoring drift. Each runs a fixed loop:
+
+```
+assess (issue from template) → you submit → evaluate (score vs rubric) → evidence → mastery
+```
+
+- `templates/assessment/{explain,apply,build}.md` — fixed task structure (the AI fills only the question).
+- `templates/rubric/{explain,apply,build}.md` — fixed scoring dimensions + scale (the AI can't make up its own).
+- `subjects/{subject}/assessments/{date}-{kind}.md` — the issued task, your submission, and the result.
+
+`build` is the milestone tier — a small but real artifact, interrogated before it's scored. It's the only path to the evidence an `expert` rating requires.
 
 ## ⚙️ The Engine
 
 | File | Role |
 |------|------|
-| `src/learn-it.ts` | Session router — dashboard, watcher, cards, mastery, assessment. |
-| `src/lifecycle.ts` | The phase map: infers a topic's phase and advises (never blocks). |
+| `src/learn-it.ts` | Session router — dashboard, watcher, concepts, cards, assess/evaluate, mastery. |
+| `src/lifecycle.ts` | The phase map: infers a subject's phase and advises (never blocks). |
 | `src/scheduler.ts` | SM-2 spaced-repetition core; logs every recall to `reviews`. |
-| `src/mastery.ts` | Dreyfus tiers + harsh, performance-based scoring (no volume credit). |
+| `src/mastery.ts` | Dreyfus tiers, rolled up over concepts + evidence (no volume credit). |
 | `src/init-db.ts` | Creates the SQLite schema. |
-| `data/learn_it.db` | Cards, the append-only `reviews` log, exam/Feynman `verifications`. |
-| `stages/*.md` | The instructions for each learning stage. |
+| `data/learn_it.db` | `subjects`, `concepts`, `flashcards`, the append-only `reviews` log, and `evidence`. |
+| `stages/*.md`, `templates/*` | Stage instructions and fixed assessment/rubric structures. |
 
 ## 💻 Getting Started
 
 ```bash
 bun install
-bun src/init-db.ts                          # create the database
+bun src/init-db.ts                     # create the database
 
-bun src/learn-it.ts init "rust-ownership"   # start a topic (fill its audit.md)
-bun src/learn-it.ts init "networking"       # and another — run as many as you like
-bun src/learn-it.ts                          # dashboard: every topic + what's due
+bun src/learn-it.ts init "rust"        # start a subject (fill its audit.md)
+bun src/learn-it.ts init "networking"  # and another — run as many as you like
+bun src/learn-it.ts                     # dashboard: every subject, its tier + what's due
 ```
 
-Then drive it conversationally with the skill: `/learn-it` shows the dashboard across all your topics; `/learn-it review` runs today's due cards, interleaved across everything.
+Then drive it conversationally with the skill: `/learn-it` shows the dashboard across all your subjects; `/learn-it plan rust` turns your audit into a roadmap of concepts; `/learn-it review` runs today's due cards, interleaved across everything.
 
 ## 🤝 Contributing
 
