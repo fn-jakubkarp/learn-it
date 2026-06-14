@@ -1,15 +1,21 @@
-// Mastery scoring. Harsh, per-area, and PERFORMANCE-based — never volume.
+// Mastery scoring. Harsh, per-SUBJECT, and PERFORMANCE-based — never volume.
 //
-// The model is the Dreyfus skill-acquisition ladder. You cannot grind your way
-// up: each tier above advanced-beginner gates on PROVEN RETENTION (cards
-// recalled after long gaps) and VERIFICATION (passing an exam, teaching it
-// back). Knowing a for-loop is advanced-beginner, full stop. The top tier is
-// brutal by design, because real expertise is — the last stretch genuinely
-// takes the most work (power-law learning curve).
+// The model is the Dreyfus skill-acquisition ladder; mastery lives at the
+// subject level only (a single concept is proven-or-not, it has no tier). A
+// subject's tier rolls up from its concepts: breadth of PROVEN concepts + depth
+// of demonstrated evidence.
 //
-// Every signal here comes from the append-only `reviews` / `verifications`
-// tables, so the score reflects what the learner demonstrably did, not what
-// they typed into a file.
+// A concept is "proven" two ways — recalled after a long gap (flashcards) OR
+// backed by passing higher-Bloom evidence (you explained/applied it). So a
+// practitioner who learns by doing isn't forced to grind cards: demonstrating
+// it counts. This is also how a placement diagnostic (explore-gaps) can lift a
+// newcomer straight to their real level instead of starting everyone at novice.
+//
+// But you cannot fake your way to the top. EXPERT additionally requires a real
+// BUILD and DURABILITY — long-term retention OR evidence spread over real time.
+// A single diagnostic session can therefore reach at most proficient. Every
+// signal comes from the append-only reviews / evidence tables — demonstrated,
+// not self-reported.
 
 export const DREYFUS = [
 	"novice",
@@ -21,19 +27,31 @@ export const DREYFUS = [
 
 export type Tier = (typeof DREYFUS)[number];
 
-// A recall counts as "retained" only after surviving this gap; "long" retention
-// is the sterner bar reserved for expertise.
+// Bloom level per evidence kind — the depth a piece of evidence demonstrates.
+export const EVIDENCE_BLOOM = { explain: 2, apply: 4, build: 6 } as const;
+export type EvidenceKind = keyof typeof EVIDENCE_BLOOM;
+
 export const RETENTION_DAYS = 21;
 export const LONG_RETENTION_DAYS = 60;
-export const EXAM_PASS = 70; // 0-100; an exam at/above this proves apply-level depth
+export const PASS = 70; // evidence at/above this passes; 90+ needed for expert
 
+// "Durability via repeated evidence" alternative to long retention: passing
+// apply/build evidence on at least this many distinct days, spanning at least
+// this many days. A single session satisfies neither.
+export const SUSTAINED_MIN_DAYS = 3;
+export const SUSTAINED_MIN_SPAN_DAYS = 30;
+
+// Rolled up over a subject's concepts + its evidence.
 export interface MasterySignals {
-	cards: number;
-	retainedCards: number; // distinct cards recalled at interval_before >= RETENTION_DAYS
-	longRetainedCards: number; // ... >= LONG_RETENTION_DAYS
-	bestExam: number; // 0-100, 0 if none taken
-	examPassed: boolean; // any exam >= EXAM_PASS
-	feynmanPassed: boolean; // taught it back successfully
+	concepts: number; // size of the roadmap (the concept list)
+	coveredConcepts: number; // concepts touched by a card or concept-level evidence
+	provenConcepts: number; // concepts retained (cards) OR backed by passing evidence
+	longRetainedConcepts: number; // concepts recalled past LONG_RETENTION_DAYS (cards only)
+	bestApply: number; // best apply-evidence score, 0 if none
+	applyPassed: boolean; // applied it (solved a problem / exam)
+	explainPassed: boolean; // taught it back
+	buildPassed: boolean; // shipped a real artifact — REQUIRED for expert
+	sustainedEvidence: boolean; // passing apply/build spread over real time (see consts)
 }
 
 interface Requirement {
@@ -44,68 +62,87 @@ interface Requirement {
 
 const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
 const frac = (part: number, whole: number) => (whole > 0 ? part / whole : 0);
+const coverage = (s: MasterySignals) => frac(s.coveredConcepts, s.concepts);
 
-// What each tier demands ON TOP of the one below. Empty for novice (the floor).
+// Durability for the expert gate: sustained retention OR evidence over time.
+// This is the one requirement a single diagnostic session cannot satisfy.
+const durable = (s: MasterySignals) =>
+	(s.concepts > 0 && s.longRetainedConcepts >= Math.ceil(s.concepts * 0.5)) ||
+	s.sustainedEvidence;
+
+// What each tier demands ON TOP of the one below. Everything gates on a roadmap
+// existing (concepts > 0) — without one, coverage is undefined and a subject
+// can't climb past advanced-beginner. That's intended: plan the concepts first.
 const TIER_REQS: Record<Tier, Requirement[]> = {
 	novice: [],
 	"advanced-beginner": [
 		{
-			label: "make at least 3 cards",
-			met: (s) => s.cards >= 3,
-			progress: (s) => clamp01(s.cards / 3),
+			label: "engage at least one concept (a card or a probe)",
+			met: (s) => s.coveredConcepts >= 1,
+			progress: (s) => clamp01(s.coveredConcepts),
 		},
 	],
 	competent: [
 		{
-			label: "build out 10+ cards",
-			met: (s) => s.cards >= 10,
-			progress: (s) => clamp01(s.cards / 10),
+			label: "cover half the roadmap",
+			met: (s) => s.concepts > 0 && coverage(s) >= 0.5,
+			progress: (s) => clamp01(coverage(s) / 0.5),
 		},
 		{
-			label: `retain half your cards past ${RETENTION_DAYS} days`,
-			met: (s) => s.cards > 0 && s.retainedCards >= Math.ceil(s.cards * 0.5),
-			progress: (s) => clamp01(frac(s.retainedCards, Math.ceil(s.cards * 0.5))),
+			label: "prove 40% of concepts (retain or demonstrate)",
+			met: (s) =>
+				s.concepts > 0 && s.provenConcepts >= Math.ceil(s.concepts * 0.4),
+			progress: (s) =>
+				clamp01(frac(s.provenConcepts, Math.ceil(s.concepts * 0.4))),
 		},
 	],
 	proficient: [
 		{
-			label: "build out 15+ cards",
-			met: (s) => s.cards >= 15,
-			progress: (s) => clamp01(s.cards / 15),
+			label: "cover 70% of the roadmap",
+			met: (s) => coverage(s) >= 0.7,
+			progress: (s) => clamp01(coverage(s) / 0.7),
 		},
 		{
-			label: `retain 70% of your cards past ${RETENTION_DAYS} days`,
-			met: (s) => s.cards > 0 && s.retainedCards >= Math.ceil(s.cards * 0.7),
-			progress: (s) => clamp01(frac(s.retainedCards, Math.ceil(s.cards * 0.7))),
+			label: "prove 60% of concepts (retain or demonstrate)",
+			met: (s) =>
+				s.concepts > 0 && s.provenConcepts >= Math.ceil(s.concepts * 0.6),
+			progress: (s) =>
+				clamp01(frac(s.provenConcepts, Math.ceil(s.concepts * 0.6))),
 		},
 		{
-			label: `pass an exam (score >= ${EXAM_PASS})`,
-			met: (s) => s.examPassed,
-			progress: (s) => clamp01(s.bestExam / EXAM_PASS),
+			label: `apply it — pass an apply assessment (>= ${PASS})`,
+			met: (s) => s.applyPassed,
+			progress: (s) => clamp01(s.bestApply / PASS),
 		},
 	],
 	expert: [
 		{
-			label: "build out 20+ cards",
-			met: (s) => s.cards >= 20,
-			progress: (s) => clamp01(s.cards / 20),
+			label: "cover 80% of the roadmap",
+			met: (s) => coverage(s) >= 0.8,
+			progress: (s) => clamp01(coverage(s) / 0.8),
 		},
 		{
-			label: `retain 60% of your cards past ${LONG_RETENTION_DAYS} days`,
-			met: (s) =>
-				s.cards > 0 && s.longRetainedCards >= Math.ceil(s.cards * 0.6),
+			label: `prove durability — retain 50% of concepts past ${LONG_RETENTION_DAYS} days, OR pass apply/build evidence over ${SUSTAINED_MIN_SPAN_DAYS}+ days`,
+			met: durable,
 			progress: (s) =>
-				clamp01(frac(s.longRetainedCards, Math.ceil(s.cards * 0.6))),
+				durable(s)
+					? 1
+					: clamp01(frac(s.longRetainedConcepts, Math.ceil(s.concepts * 0.5))),
 		},
 		{
-			label: "score 90+ on an exam",
-			met: (s) => s.bestExam >= 90,
-			progress: (s) => clamp01(s.bestExam / 90),
+			label: "score 90+ on an apply assessment",
+			met: (s) => s.bestApply >= 90,
+			progress: (s) => clamp01(s.bestApply / 90),
 		},
 		{
-			label: "teach it back (pass a Feynman session)",
-			met: (s) => s.feynmanPassed,
-			progress: (s) => (s.feynmanPassed ? 1 : 0),
+			label: "teach it back (pass an explain assessment)",
+			met: (s) => s.explainPassed,
+			progress: (s) => (s.explainPassed ? 1 : 0),
+		},
+		{
+			label: "BUILD something real (pass a build assessment)",
+			met: (s) => s.buildPassed,
+			progress: (s) => (s.buildPassed ? 1 : 0),
 		},
 	],
 };
@@ -137,4 +174,9 @@ export function assessMastery(s: MasterySignals): MasteryResult {
 	const blocking = reqs.filter((r) => !r.met(s)).map((r) => r.label);
 
 	return { tier, tierIndex, withinTier: Math.round(avg * 100), blocking };
+}
+
+// Index of a tier name, or -1. Used to compare current vs target.
+export function tierIndexOf(tier: string): number {
+	return (DREYFUS as readonly string[]).indexOf(tier);
 }
