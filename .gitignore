@@ -5,9 +5,12 @@ node_modules
 out
 dist
 *.tgz
-output
 
-# generated state (learn-it engine owns this)
+# user data & generated state — keep the directory (.gitkeep), ignore contents
+output/*
+!output/.gitkeep
+subjects/*
+!subjects/.gitkeep
 data/*.db
 
 # code coverage
