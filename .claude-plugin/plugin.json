@@ -1,0 +1,9 @@
+{
+	"name": "learn-it",
+	"version": "0.1.0",
+	"description": "Cognitive learning engine — subjects broken into concepts, an FSRS scheduler, session notes, and harsh per-subject mastery scored from logged performance. Tools, not rails.",
+	"author": {
+		"name": "jakubkarp"
+	},
+	"license": "MIT"
+}

@@ -15,13 +15,31 @@ The **roadmap is the concept list**. Coverage and mastery roll up from concepts,
 
 | File | Role |
 |------|------|
-| `init-db.ts` | SQLite schema: `subjects`, `concepts`, `flashcards`, append-only `reviews`, `evidence`. |
-| `scheduler.ts` | FSRS spaced repetition; every grade logs a `reviews` row with the interval the card survived. |
+| `init-db.ts` | SQLite schema: `subjects`, `concepts` (each with its own exposure clock), `flashcards`, append-only `reviews`, `evidence`, `exposures`, `sessions`. Enforces foreign keys + WAL; idempotent column migrations. |
+| `scheduler.ts` | FSRS spaced repetition; every grade logs a `reviews` row with the **real elapsed days** the card survived (`today − last_reviewed`), so retention can't be faked by same-day grading. `replayCard` powers `ungrade`. |
+| `exposure.ts` | Concept-level spaced exposure: a concept's FSRS clock advanced by ANY surface (re-explain, quiz, re-read, card). `read` is recognition (capped, never proves); the rest are retrieval. The reinforcement queue (`dueConcepts`) and `recordExposure` live here. |
 | `mastery.ts` | Dreyfus tiers computed from logged performance (no volume credit). |
 | `lifecycle.ts` | Phase **map** (diagnose→…→mastered); infers phase from real state, advises but never blocks. |
 | `learn-it.ts` | CLI router: dashboard, concepts, cards, probe, assess/evaluate, mastery, target. |
 
 State (phase, tier) is **never stored** — it's computed from Knowledge (`subjects/<s>/*.md`, learner-authored) + the logged tables. The engine writes State, reads Knowledge, never edits a file you authored.
+
+## Cards are one surface — spacing lives on the concept
+
+The core loop is **diagnose the gaps → talk through them → agree a fix plan → keep concepts alive by spaced, varied re-exposure**, with substantive assessments for tier-moving evidence. Flashcards are an addon (with a read engine), not the spine.
+
+So spacing is a property of the **concept**, not the card. Each concept carries its own FSRS clock (`concepts.stability/difficulty/interval/next_exposure`, `src/exposure.ts`) advanced by whichever surface the learner uses:
+
+| Surface | Kind | Credit |
+|---------|------|--------|
+| `explain` (Feynman, micro) | retrieval | full — counts toward "proven" |
+| `quiz` (one sharp question) | retrieval | full — counts toward "proven" |
+| `card` (a flashcard review) | retrieval | full — counts toward "proven" |
+| `read` (re-read your note) | recognition | capped (≤ "Hard"); keeps the concept warm, never proves it |
+
+`due-concepts` (a.k.a. `reinforce`) is the primary "what should I do now" queue — weakest (blank → shaky → known) and most overdue first. A probe both *places* a concept (status) and seeds its clock; a card review records a `card` exposure so cards and talk feed the same schedule. Mastery's "proven"/durability roll-up counts retrieval across real gaps from **all** surfaces — finally symmetric, instead of flashcards-only. `read` is deliberately excluded from proof because re-reading is recognition, not recall.
+
+**Assessments are separate and substantive** — real, actionable deliverables ("build a class with one method that does X", "solve this new problem") graded against a rubric. They are not exposure surfaces and must not be watered down into "read a paragraph" tasks.
 
 ## The learning map (not a railroad)
 
@@ -33,7 +51,7 @@ diagnose → conceptualize → recall → space → verify → mastered
 - **Inferred phase.** Audit filled? concepts planned? cards? reviews? applied evidence? → the phase follows.
 - **Many subjects at once**, each at its own phase. The review queue interleaves due cards across all of them.
 
-Stages live as prompts in `stages/*.md`; the skill router is `.agents/skills/learn-it/SKILL.md`.
+Stages live as prompts in `stages/*.md`; the skill router is `skills/learn-it/SKILL.md` (symlinked into `.claude/skills/learn-it/` for project-skill discovery, and packaged as a plugin via `.claude-plugin/plugin.json`).
 
 ## Diagnose before you teach
 
@@ -65,6 +83,18 @@ assess (issue from template) → learner submits → evaluate (score vs rubric) 
 - `subjects/<subject>/assessments/<date>-<kind>.md` — the issued task, the submission, and the result.
 
 A `build` is the milestone tier — a small but real artifact, interrogated before scoring; the only path to the evidence an expert rating requires.
+
+## Two streams + session continuity
+
+Flashcards are **one** stream, never the whole tool — mastery is medium-agnostic, and the highest-Bloom evidence comes from *talking*: explaining, applying, building. So the engine carries a **conversational stream** alongside cards:
+
+- **`note` / `sessions`** — at the end of a working session the mentor writes a short note to the `sessions` table (what was covered, where the learner struggled, what to revisit). `resume` surfaces the latest per subject, so the next session — which may be pure dialogue, not a card review — picks up with context instead of cold-starting. These are engine State (LLM-authored, computed from what happened), distinct from the learner-authored `subjects/<s>/notes.md`.
+
+## Dashboard wiring
+
+`export` emits the full learner state as JSON (subjects, tiers, phases, concepts, cards + FSRS state, evidence, sessions, due counts) on stdout. It is the read surface an external dashboard consumes — the engine still owns the database; the dashboard only reads. `doctor` is the matching health check (schema, pragmas, grader provenance, orphans).
+
+`src/dashboard.ts` is a dependency-free, build-free dashboard: `bun src/dashboard.ts` runs a `Bun.serve` HTTP server (default `:4321`) that serves one static page (`src/dashboard.html`) and a tiny JSON API which **shells out to the same CLI** — `export` for live state, `grade`/`note` for writes. So it adds no new source of truth and stays consistent with every CLI command; each request re-reads the database, so the watcher is always live. Card grades from the dashboard are self-graded recall practice, logged with `grader = "dashboard"` so they're distinguishable from AI-graded assessments in a provenance audit — tier-moving evidence still comes through the AI-graded assessment loop.
 
 ## Honest limits
 

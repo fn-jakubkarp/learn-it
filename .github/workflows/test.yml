@@ -1,0 +1,23 @@
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install --frozen-lockfile
+      # The same gate CLAUDE.md mandates before every commit, now enforced.
+      - run: bunx biome check
+      - run: bunx tsc --noEmit
+      - run: bun test
+      # Schema smoke: the migration must apply cleanly on a fresh checkout.
+      - run: bun src/init-db.ts
