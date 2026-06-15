@@ -15,13 +15,31 @@ The **roadmap is the concept list**. Coverage and mastery roll up from concepts,
 
 | File | Role |
 |------|------|
-| `init-db.ts` | SQLite schema: `subjects`, `concepts`, `flashcards`, append-only `reviews`, `evidence`, `sessions`. Enforces foreign keys + WAL; idempotent column migrations. |
+| `init-db.ts` | SQLite schema: `subjects`, `concepts` (each with its own exposure clock), `flashcards`, append-only `reviews`, `evidence`, `exposures`, `sessions`. Enforces foreign keys + WAL; idempotent column migrations. |
 | `scheduler.ts` | FSRS spaced repetition; every grade logs a `reviews` row with the **real elapsed days** the card survived (`today − last_reviewed`), so retention can't be faked by same-day grading. `replayCard` powers `ungrade`. |
+| `exposure.ts` | Concept-level spaced exposure: a concept's FSRS clock advanced by ANY surface (re-explain, quiz, re-read, card). `read` is recognition (capped, never proves); the rest are retrieval. The reinforcement queue (`dueConcepts`) and `recordExposure` live here. |
 | `mastery.ts` | Dreyfus tiers computed from logged performance (no volume credit). |
 | `lifecycle.ts` | Phase **map** (diagnose→…→mastered); infers phase from real state, advises but never blocks. |
 | `learn-it.ts` | CLI router: dashboard, concepts, cards, probe, assess/evaluate, mastery, target. |
 
 State (phase, tier) is **never stored** — it's computed from Knowledge (`subjects/<s>/*.md`, learner-authored) + the logged tables. The engine writes State, reads Knowledge, never edits a file you authored.
+
+## Cards are one surface — spacing lives on the concept
+
+The core loop is **diagnose the gaps → talk through them → agree a fix plan → keep concepts alive by spaced, varied re-exposure**, with substantive assessments for tier-moving evidence. Flashcards are an addon (with a read engine), not the spine.
+
+So spacing is a property of the **concept**, not the card. Each concept carries its own FSRS clock (`concepts.stability/difficulty/interval/next_exposure`, `src/exposure.ts`) advanced by whichever surface the learner uses:
+
+| Surface | Kind | Credit |
+|---------|------|--------|
+| `explain` (Feynman, micro) | retrieval | full — counts toward "proven" |
+| `quiz` (one sharp question) | retrieval | full — counts toward "proven" |
+| `card` (a flashcard review) | retrieval | full — counts toward "proven" |
+| `read` (re-read your note) | recognition | capped (≤ "Hard"); keeps the concept warm, never proves it |
+
+`due-concepts` (a.k.a. `reinforce`) is the primary "what should I do now" queue — weakest (blank → shaky → known) and most overdue first. A probe both *places* a concept (status) and seeds its clock; a card review records a `card` exposure so cards and talk feed the same schedule. Mastery's "proven"/durability roll-up counts retrieval across real gaps from **all** surfaces — finally symmetric, instead of flashcards-only. `read` is deliberately excluded from proof because re-reading is recognition, not recall.
+
+**Assessments are separate and substantive** — real, actionable deliverables ("build a class with one method that does X", "solve this new problem") graded against a rubric. They are not exposure surfaces and must not be watered down into "read a paragraph" tasks.
 
 ## The learning map (not a railroad)
 

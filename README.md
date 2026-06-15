@@ -28,13 +28,13 @@ Learn-it is built around a 6-step framework based on how the human brain natural
 ### 3. Anchoring Facts
 * **Use mnemonics:** For raw data that can't be deduced logically (names, dates, syntax), use techniques like the Memory Palace or acronyms to glue the facts into your working memory.
 
-### 4. Active Recall
-* **Ditch passive reading:** Rereading notes gives an illusion of competence. 
-* **Quizzes & Flashcards:** Learn-it forces your brain to retrieve information from scratch. The physical act of reaching into your memory strengthens neural pathways.
+### 4. Active Recall — through many surfaces
+* **Ditch passive reading:** Rereading notes gives an illusion of competence; the engine credits it as recognition only, never as proof.
+* **Retrieve, however fits:** the real work is pulling a concept *from memory* — by re-explaining it (Feynman), answering a sharp quiz question, doing a small real task, or reviewing a card. **Flashcards are one surface, not the point.** Each is a retrieval that strengthens the trace.
 
-### 5. Spaced Repetition
-* **Consolidate knowledge:** Memory is formed through the process of forgetting and remembering. 
-* **Optimized intervals:** Learn-it schedules with **FSRS** — the modern successor to SM-2 that Anki adopted as its default. Rather than fixed steps, it models each card's memory *stability* and *difficulty* and sets the next review for the day your recall probability is predicted to fall to a target (~90%) — so each review lands right as you're about to forget. (It uses FSRS v4's published default weights, not yet fitted to your own history, so that ~90% is an approximate target.) Crucially, the model uses the **real time elapsed** since your last review, so grinding a card the same day moves nothing — only genuine retention across real gaps counts.
+### 5. Spaced Repetition — on concepts, any surface
+* **Consolidate knowledge:** memory is built by forgetting and re-retrieving, spaced out over time.
+* **The concept is the unit.** Each *concept* carries its own schedule (FSRS — the modern successor to SM-2 Anki adopted), advanced by whichever surface you reinforce it with — re-explain, quiz, re-read, or a card. `reinforce` surfaces the concepts that have gone stale, weakest first; you keep them alive by *varying* how you hit them. (Weights are FSRS v4 defaults, not yet fitted to you, so the ~90% recall target is approximate.) Spacing uses the **real time elapsed**, so grinding the same day moves nothing — only genuine retention across real gaps counts.
 
 ### 6. Brutal Verification & Transfer
 * **Real-world scenarios:** Try to explain the topic simply, applying it to real-life examples (The Feynman Technique). 
@@ -149,10 +149,12 @@ bun src/learn-it.ts doctor                         # health check
 |------|------|
 | `src/learn-it.ts` | Session router — dashboard, watcher, concepts, cards, assess/evaluate, mastery, session notes, `export`, `doctor`. |
 | `src/lifecycle.ts` | The phase map: infers a subject's phase and advises (never blocks). |
-| `src/scheduler.ts` | FSRS spaced-repetition core; logs every recall to `reviews` against **real elapsed time**. |
+| `src/scheduler.ts` | FSRS core for flashcards; logs every recall to `reviews` against **real elapsed time**. |
+| `src/exposure.ts` | Concept-level spaced exposure: each concept's clock, advanced by any surface (re-explain / quiz / re-read / card). The `reinforce` queue lives here. |
 | `src/mastery.ts` | Dreyfus tiers, rolled up over concepts + evidence (no volume credit). |
 | `src/init-db.ts` | Creates / migrates the SQLite schema (FKs + WAL on). |
-| `data/learn_it.db` | `subjects`, `concepts`, `flashcards`, the append-only `reviews` log, `evidence`, and `sessions`. |
+| `src/dashboard.ts` | Build-free local web dashboard (`bun src/dashboard.ts`). |
+| `data/learn_it.db` | `subjects`, `concepts`, `flashcards`, append-only `reviews`, `exposures`, `evidence`, and `sessions`. |
 | `stages/*.md`, `templates/*` | Stage instructions and fixed assessment/rubric structures. |
 | `skills/learn-it/SKILL.md` | The `/learn-it` skill that drives the CLI conversationally. |
 

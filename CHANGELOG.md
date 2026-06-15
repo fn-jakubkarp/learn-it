@@ -31,6 +31,17 @@ pre-1.0, so the public surface may still shift.
 
 ### Added
 
+- **Concept-level spaced exposure engine** (`src/exposure.ts`) — spacing now lives
+  on the *concept*, not the flashcard, so talking and varied re-exposure are
+  first-class. Each concept has its own FSRS clock advanced by any surface:
+  `expose <subject> <concept> <explain|quiz|read|card> [0-5]`. `explain`/`quiz`/
+  `card` are retrieval (count toward "proven"); `read` is recognition (capped, never
+  proves). `due-concepts` (alias `reinforce`) is the primary "what to reinforce now"
+  queue, weakest + most overdue first. `probe` also places a concept (`mark`:
+  blank/shaky/known) and seeds its clock; a card review records a `card` exposure so
+  cards and talk feed one schedule. Mastery counts retrieval across real gaps from
+  all surfaces. New `reinforce`/`quiz` stages; `resume` and the dashboard lead with
+  concepts-to-reinforce, demoting flashcards to one surface.
 - **Card & concept management:** `show`, `editcard`, `delcard`, `delconcept`,
   `suspend`, and `ungrade` (undo the last grade by replaying the recall log).
 - **Session notes — the conversational stream:** `note` / `sessions` capture an

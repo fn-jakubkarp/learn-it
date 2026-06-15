@@ -3,12 +3,14 @@ name: learn-it
 description: Cognitive learning engine -- subjects broken into concepts, a watcher that tracks many subjects at once, an FSRS scheduler, and harsh per-subject mastery scored from logged performance. Tools, not rails.
 arguments: stage
 user_invocable: true
-argument-hint: "[ (no args = resume) | init | explore-topic | explore-gaps | plan | concept | anchor | extract | review | feynman | exam | assess | evaluate | mastery ]"
+argument-hint: "[ (no args = resume) | init | explore-topic | explore-gaps | plan | concept | reinforce | quiz | feynman | extract | review | anchor | exam | assess | evaluate | mastery ]"
 ---
 
 # learn-it -- Session Router
 
 Learn-it gives the learner **proper tools and a watcher**, not a railroad.
+
+**The core loop is NOT flashcards.** It is: **find the gaps → talk through them → agree a fix plan → keep concepts alive by spaced, *varied* re-exposure** (re-explain, quiz, re-read, and — only as one option — cards), with **substantive assessments** (build/apply something real) for the evidence that moves tiers. Flashcards are an addon with a read engine, not the centre. Spacing lives on the **concept**, advanced by any surface — see `reinforce`.
 
 **Structure (2-tier):** a **subject** is the thing you master ("Rust", "Networking") — it carries the roadmap, the phase, and the Dreyfus mastery tier. A **concept** is a lesson-sized leaf under it ("ownership", "IP address types") — cards attach to concepts; a concept is retained-or-not, it has no tier of its own. The roadmap IS the concept list.
 
@@ -142,13 +144,24 @@ bun src/learn-it.ts mastery "{subject}"     # tier, % to next tier, exactly what
 ### /learn-it anchor {facts}
 - **Action**: Read `stages/anchor.md`. Build mnemonics (palace / acronym / story) for raw facts.
 
+### /learn-it reinforce [subject]  ← the primary daily loop
+- **Action**: Read `stages/reinforce.md`. Pull the due concepts, then keep each alive through the **best, varied surface** — not flashcards by default:
+  ```bash
+  bun src/learn-it.ts due-concepts ["{subject}"]                       # weakest, most overdue first
+  LEARN_IT_GRADER="<id>" bun src/learn-it.ts expose "{subject}" "{concept}" <explain|quiz|read|card> [0-5]
+  ```
+- Prefer retrieval (explain / quiz / cards) over re-reading; vary the surface; same-day repeats move nothing. Each exposure advances that concept's spaced clock.
+
+### /learn-it quiz {subject} {concept}
+- **Action**: Read `stages/quiz.md`. One sharp recall/apply question, graded by meaning → `expose ... quiz {0-5}`. A quiz is retrieval, **not** an assessment.
+
 ### /learn-it extract {subject}
-- **Action**: Read `stages/extract.md`. Turn notes + mnemonics into Q/A pairs, each tied to a concept:
+- **Action**: Read `stages/extract.md`. Turn notes + mnemonics into Q/A pairs, each tied to a concept. (Cards are one optional surface.)
   ```bash
   bun src/learn-it.ts addcard "{subject}" "{concept}" "{question}" "{answer}"
   ```
 
-### /learn-it review [subject]
+### /learn-it review [subject]  (flashcards — one surface)
 - **Action**: Read `stages/review.md`. The `due` queue is **interleaved across both subjects and concepts** (consecutive cards come from different concepts where possible — that contextual interference is deliberate). One at a time, grade the typed answer 0-5:
   ```bash
   bun src/learn-it.ts due ["{subject}"]
