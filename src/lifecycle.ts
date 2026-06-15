@@ -39,7 +39,7 @@ export interface TopicSignals {
 export const PHASE_SUGGESTION: Record<Phase, string> = {
 	diagnose: "explore-topic / explore-gaps, then plan",
 	conceptualize:
-		"concept, then extract -> review (anchor optional, raw facts only)",
+		"probe / assess to test what you know, or concept -> extract -> review to build cards. Notes optional — self-written retain best.",
 	recall: "review",
 	space: "review",
 	verify: "feynman, then exam",
@@ -96,6 +96,16 @@ export function advise(stage: string, phase: Phase, s: TopicSignals): Advice {
 					note: "audit is empty — the roadmap will be generic. Fill the topic's audit.md first for a tailored plan.",
 				};
 			return ok;
+		case "concept":
+			// Notes are a TOOL, never a gate. The generation effect favours notes
+			// the learner writes themselves, but mastery is measured by evidence and
+			// retention — not by notes — so a learner who would rather be tested can
+			// skip straight to probe/assess and lose nothing. Always recommended; the
+			// note rides along as a tip, not a block.
+			return {
+				recommended: true,
+				note: "notes are optional — write your own (they retain best) or skip to probe/assess to be tested instead.",
+			};
 		case "extract":
 			if (s.cardCount === 0 && !s.hasRoadmap)
 				return {

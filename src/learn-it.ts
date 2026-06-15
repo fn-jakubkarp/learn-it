@@ -286,11 +286,11 @@ function checkStage(stage?: string, name?: string) {
 	if (!subject)
 		return console.log(`NOTE: no subject "${name}" — run: init "${name}"`);
 	const advice = advise(stage, phaseOf(subject), readSignals(subject));
-	console.log(
-		advice.recommended
-			? `OK (phase: ${phaseOf(subject)})`
-			: `NOTE: ${advice.note}`,
-	);
+	if (advice.recommended)
+		console.log(
+			`OK (phase: ${phaseOf(subject)})${advice.note ? ` — TIP: ${advice.note}` : ""}`,
+		);
+	else console.log(`NOTE: ${advice.note}`);
 }
 
 function addCard(
