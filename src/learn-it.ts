@@ -22,10 +22,27 @@ import {
 	SUSTAINED_MIN_SPAN_DAYS,
 	tierIndexOf,
 } from "./mastery";
-import { getDueCards, gradeCard, today } from "./scheduler";
+import {
+	type CardRow,
+	getDueCards,
+	gradeCard,
+	replayCard,
+	today,
+} from "./scheduler";
 
-const DB_PATH = path.join(".", "data", "learn_it.db");
+// Resolve the DB relative to THIS file, not the caller's cwd — otherwise running
+// from another directory silently CREATEs a fresh empty db there and abandons all
+// logged performance (the single source of truth for un-gameable mastery).
+const DB_PATH = path.join(import.meta.dir, "..", "data", "learn_it.db");
+if (!fs.existsSync(DB_PATH)) {
+	console.log("Database not initialized. Run:  bun src/init-db.ts");
+	process.exit(1);
+}
 const db = new Database(DB_PATH);
+// Match init-db: enforce FKs, use WAL, tolerate rapid back-to-back invocations.
+db.run("PRAGMA foreign_keys = ON");
+db.run("PRAGMA journal_mode = WAL");
+db.run("PRAGMA busy_timeout = 5000");
 
 const [command, ...args] = process.argv.slice(2);
 
@@ -130,7 +147,11 @@ function readSignals(subject: SubjectRow): TopicSignals {
 		reviewedCount: stats.r ?? 0,
 		maturedCount: stats.m ?? 0,
 		hasAppliedEvidence: applied > 0,
-		mastered: subject.mastered_at != null,
+		// Derive "mastered" from the LIVE tier, not the sticky mastered_at flag, so
+		// expanding the roadmap after mastering re-opens the subject instead of
+		// pinning phase to "mastered" forever. mastered_at remains a record of when
+		// expert was first reached (see stampMasteredIfExpert), not a phase latch.
+		mastered: assessMastery(masterySignals(subject)).tier === "expert",
 	};
 }
 
@@ -150,11 +171,15 @@ function masterySignals(subject: SubjectRow): MasterySignals {
 			.get(sid) as { c: number }
 	).c;
 
+	// "Covered" = engaged, not merely populated: a card counts only once it has
+	// been reviewed at least once (repetitions >= 1), OR the concept has passing
+	// evidence. A bare unreviewed card is not coverage — that keeps volume from
+	// nudging the coverage gates (CLAUDE.md: "Volume never lifts a tier").
 	const covered = (
 		db
 			.query(
 				`SELECT COUNT(*) AS c FROM (
-           SELECT concept_id FROM flashcards WHERE subject_id = ?
+           SELECT concept_id FROM flashcards WHERE subject_id = ? AND repetitions >= 1
            UNION
            SELECT concept_id FROM evidence
              WHERE subject_id = ? AND concept_id IS NOT NULL AND passed = 1
@@ -327,10 +352,268 @@ function grade(cardId?: string, quality?: string) {
 	const q = Number(quality);
 	if (!cardId || Number.isNaN(q) || q < 0 || q > 5)
 		return console.log("Usage: grade <cardId> <quality 0-5>");
-	const card = gradeCard(db, Number(cardId), q, grader());
+	const id = Number(cardId);
+	const card = db.query("SELECT * FROM flashcards WHERE id = ?").get(id) as
+		| CardRow
+		| undefined;
+	if (!card)
+		return console.log(`No card with id ${id} — run \`due\` to see valid ids.`);
+	// Soft due-check: an early review barely moves retention (elapsed≈0 ⇒ the
+	// interval won't grow). Surface it, never block — the learner decides.
+	if (card.next_review > today())
+		console.log(
+			`NOTE: card ${id} isn't due until ${card.next_review}; an early review barely moves retention.`,
+		);
+	const updated = gradeCard(db, id, q, grader());
 	console.log(
-		`Card ${card.id} -> next review ${card.next_review} (interval ${card.interval}d)`,
+		`Card ${updated.id} -> next review ${updated.next_review} (interval ${updated.interval}d)`,
 	);
+}
+
+// ---- card & concept management ----------------------------------------------
+
+function showCard(cardId?: string) {
+	if (!cardId) return console.log("Usage: show <cardId>");
+	const card = db
+		.query("SELECT * FROM flashcards WHERE id = ?")
+		.get(Number(cardId)) as CardRow | undefined;
+	if (!card) return console.log(`No card with id ${cardId}.`);
+	console.log(`Card ${card.id}${card.suspended ? "  (suspended)" : ""}`);
+	console.log(`  Q: ${card.question}`);
+	console.log(`  A: ${card.answer}`);
+	console.log(
+		`  interval ${card.interval}d | stability ${card.stability.toFixed(2)} | difficulty ${card.difficulty.toFixed(2)} | reps ${card.repetitions} | next ${card.next_review}${card.last_reviewed ? ` | last ${card.last_reviewed}` : " | never reviewed"}`,
+	);
+}
+
+// Fix a typo without touching scheduling — editing the text shouldn't reset the
+// memory state a learner has built on the card.
+function editCard(cardId?: string, question?: string, answer?: string) {
+	if (!cardId || !question || !answer)
+		return console.log('Usage: editcard <cardId> "<question>" "<answer>"');
+	const id = Number(cardId);
+	if (!db.query("SELECT id FROM flashcards WHERE id = ?").get(id))
+		return console.log(`No card with id ${id}.`);
+	db.run("UPDATE flashcards SET question = ?, answer = ? WHERE id = ?", [
+		question,
+		answer,
+		id,
+	]);
+	console.log(`Card ${id} updated (scheduling unchanged).`);
+}
+
+// Hard-delete a card and its recall history together (FK enforcement requires the
+// child reviews to go first). Deleting your own card isn't gaming — you can't
+// inflate a score by removing evidence — so this is allowed outright.
+function delCard(cardId?: string) {
+	if (!cardId) return console.log("Usage: delcard <cardId>");
+	const id = Number(cardId);
+	if (!db.query("SELECT id FROM flashcards WHERE id = ?").get(id))
+		return console.log(`No card with id ${id}.`);
+	db.transaction(() => {
+		db.run("DELETE FROM reviews WHERE card_id = ?", [id]);
+		db.run("DELETE FROM flashcards WHERE id = ?", [id]);
+	})();
+	console.log(`Card ${id} deleted (with its recall history).`);
+}
+
+// Remove a roadmap leaf — but only when empty. Refuse to silently cascade-delete
+// logged cards/evidence; the learner should delcard those first, deliberately.
+function delConcept(subjectName?: string, conceptName?: string) {
+	if (!subjectName || !conceptName)
+		return console.log('Usage: delconcept "<subject>" "<concept>"');
+	const subject = getSubject(subjectName);
+	if (!subject) return console.log(`No subject: ${subjectName}`);
+	const concept = getConcept(subject.id, conceptName);
+	if (!concept)
+		return console.log(`No concept "${conceptName}" in ${subjectName}.`);
+	const cards = (
+		db
+			.query("SELECT COUNT(*) AS c FROM flashcards WHERE concept_id = ?")
+			.get(concept.id) as { c: number }
+	).c;
+	const ev = (
+		db
+			.query("SELECT COUNT(*) AS c FROM evidence WHERE concept_id = ?")
+			.get(concept.id) as { c: number }
+	).c;
+	if (cards > 0 || ev > 0)
+		return console.log(
+			`"${conceptName}" still has ${cards} card(s) and ${ev} evidence row(s) — remove those first (delcard). Refusing to cascade-delete logged history.`,
+		);
+	db.run("DELETE FROM concepts WHERE id = ?", [concept.id]);
+	console.log(`Concept "${conceptName}" removed from ${subjectName}.`);
+}
+
+// Undo the most recent grade on a card: drop the last reviews row and replay the
+// rest to restore the exact prior FSRS state. The only mutable state in the
+// engine; the recall log stays otherwise append-only.
+function ungrade(cardId?: string) {
+	if (!cardId) return console.log("Usage: ungrade <cardId>");
+	const id = Number(cardId);
+	const last = db
+		.query(
+			"SELECT id, quality, graded_at FROM reviews WHERE card_id = ? ORDER BY id DESC LIMIT 1",
+		)
+		.get(id) as { id: number; quality: number; graded_at: string } | undefined;
+	if (!last) return console.log(`No reviews to undo for card ${id}.`);
+	db.transaction(() => {
+		db.run("DELETE FROM reviews WHERE id = ?", [last.id]);
+		replayCard(db, id);
+	})();
+	const card = db
+		.query("SELECT * FROM flashcards WHERE id = ?")
+		.get(id) as CardRow;
+	console.log(
+		`Undid grade ${last.quality} (${last.graded_at}) on card ${id}. Now: interval ${card.interval}d, next ${card.next_review}.`,
+	);
+}
+
+// Take a card out of (or back into) the due queue without deleting it — for
+// leeches or a card the learner wants to pause.
+function suspendCard(cardId?: string, stateArg?: string) {
+	if (!cardId) return console.log("Usage: suspend <cardId> [on|off]");
+	const id = Number(cardId);
+	if (!db.query("SELECT id FROM flashcards WHERE id = ?").get(id))
+		return console.log(`No card with id ${id}.`);
+	const on = stateArg !== "off";
+	db.run("UPDATE flashcards SET suspended = ? WHERE id = ?", [on ? 1 : 0, id]);
+	console.log(
+		`Card ${id} ${on ? "suspended (out of the due queue)" : "unsuspended (back in rotation)"}.`,
+	);
+}
+
+// ---- session notes (the conversational stream) ------------------------------
+
+// Capture a short, LLM-authored note at the END of a working session — what was
+// covered, where the learner struggled, what to revisit. resume() surfaces the
+// latest one per subject so the next session (talking, not just cards) resumes
+// with context. Flashcards are one stream; this is the dialogue stream.
+function addNote(subjectName?: string, summary?: string) {
+	if (!subjectName || !summary)
+		return console.log('Usage: note "<subject>" "<session summary>"');
+	const subject = getSubject(subjectName);
+	if (!subject) return console.log(`No subject: ${subjectName}`);
+	db.run(
+		"INSERT INTO sessions (subject_id, summary, grader) VALUES (?, ?, ?)",
+		[subject.id, summary, grader()],
+	);
+	console.log(`Session note saved for ${subjectName}.`);
+}
+
+function listSessions(subjectName?: string) {
+	if (!subjectName) return console.log('Usage: sessions "<subject>"');
+	const subject = getSubject(subjectName);
+	if (!subject) return console.log(`No subject: ${subjectName}`);
+	const rows = db
+		.query(
+			"SELECT at, summary, grader FROM sessions WHERE subject_id = ? ORDER BY id DESC",
+		)
+		.all(subject.id) as { at: string; summary: string; grader: string }[];
+	if (!rows.length)
+		return console.log(`No session notes yet for ${subjectName}.`);
+	console.log(`Session notes for ${subjectName} (newest first):`);
+	for (const r of rows) console.log(`  [${r.at}] ${r.summary}  (${r.grader})`);
+}
+
+function latestSession(subjectId: number): string | null {
+	const row = db
+		.query(
+			"SELECT summary FROM sessions WHERE subject_id = ? ORDER BY id DESC LIMIT 1",
+		)
+		.get(subjectId) as { summary: string } | undefined;
+	return row?.summary ?? null;
+}
+
+// ---- dashboard wiring & health ----------------------------------------------
+
+// Emit the full learner state as JSON — the read surface a dashboard (or any
+// external view) consumes. Read-only; the engine still owns the DB.
+function exportJson(subjectName?: string) {
+	const subjects = subjectName
+		? ([getSubject(subjectName)].filter(Boolean) as SubjectRow[])
+		: allSubjects();
+	if (subjectName && !subjects.length)
+		return console.log(`No subject: ${subjectName}`);
+	const out = subjects.map((s) => {
+		const m = assessMastery(masterySignals(s));
+		return {
+			name: s.name,
+			tier: m.tier,
+			tierIndex: m.tierIndex,
+			withinTier: m.withinTier,
+			target: s.target_tier,
+			phase: phaseOf(s),
+			masteredAt: s.mastered_at,
+			blocking: m.blocking,
+			dueCount: dueCount(s.name),
+			concepts: db
+				.query("SELECT id, name FROM concepts WHERE subject_id = ? ORDER BY id")
+				.all(s.id),
+			cards: db
+				.query(
+					"SELECT id, concept_id, question, answer, interval, stability, difficulty, repetitions, next_review, last_reviewed, suspended FROM flashcards WHERE subject_id = ? ORDER BY id",
+				)
+				.all(s.id),
+			evidence: db
+				.query(
+					"SELECT concept_id, kind, bloom, score, passed, at, grader FROM evidence WHERE subject_id = ? ORDER BY id",
+				)
+				.all(s.id),
+			sessions: db
+				.query(
+					"SELECT summary, at, grader FROM sessions WHERE subject_id = ? ORDER BY id DESC",
+				)
+				.all(s.id),
+		};
+	});
+	console.log(JSON.stringify({ generated: today(), subjects: out }, null, 2));
+}
+
+function doctor() {
+	const count = (sql: string, ...p: unknown[]) =>
+		(db.query(sql).get(...(p as never[])) as { c: number }).c;
+	console.log("--- learn-it doctor ---");
+	console.log(`DB: ${DB_PATH}`);
+	const tables = (
+		db.query("SELECT name FROM sqlite_master WHERE type = 'table'").all() as {
+			name: string;
+		}[]
+	).map((t) => t.name);
+	for (const t of [
+		"subjects",
+		"concepts",
+		"flashcards",
+		"reviews",
+		"evidence",
+		"sessions",
+	])
+		console.log(
+			`  table ${t}: ${tables.includes(t) ? "ok" : "MISSING — run bun src/init-db.ts"}`,
+		);
+	const fk = (db.query("PRAGMA foreign_keys").get() as { foreign_keys: number })
+		.foreign_keys;
+	console.log(`  foreign_keys: ${fk ? "on" : "OFF"}`);
+	console.log(
+		`  grader env: ${process.env.LEARN_IT_GRADER?.trim() || "unset (scores log as 'unpinned')"}`,
+	);
+	console.log(
+		`  counts: subjects ${count("SELECT COUNT(*) AS c FROM subjects")}, concepts ${count("SELECT COUNT(*) AS c FROM concepts")}, cards ${count("SELECT COUNT(*) AS c FROM flashcards")}, reviews ${count("SELECT COUNT(*) AS c FROM reviews")}, evidence ${count("SELECT COUNT(*) AS c FROM evidence")}`,
+	);
+	const unpinned = count(
+		"SELECT COUNT(*) AS c FROM evidence WHERE grader IS NULL OR grader = 'unpinned'",
+	);
+	if (unpinned)
+		console.log(`  ⚠ ${unpinned} evidence score(s) have no recorded grader.`);
+	const orphan = count(
+		"SELECT COUNT(*) AS c FROM flashcards f LEFT JOIN concepts c ON f.concept_id = c.id WHERE c.id IS NULL",
+	);
+	if (orphan) console.log(`  ⚠ ${orphan} card(s) reference a missing concept.`);
+	const suspended = count(
+		"SELECT COUNT(*) AS c FROM flashcards WHERE COALESCE(suspended, 0) = 1",
+	);
+	if (suspended) console.log(`  ${suspended} card(s) suspended.`);
+	console.log("done.");
 }
 
 // Issue a home assessment: copy the right template into the subject's
@@ -577,6 +860,9 @@ function resume() {
 		console.log(
 			`  [${tierLabel(s)}] ${s.name}  (${due > 0 ? `${due} due` : "—"})  -> ${next}`,
 		);
+		// Carry context across sessions: the last thing the mentor noted.
+		const note = latestSession(s.id);
+		if (note) console.log(`        last session: ${note}`);
 	}
 	if (dueCount() > 0) console.log("\nReview everything due:  /learn-it review");
 }
@@ -599,6 +885,18 @@ function main() {
 			return checkStage(args[0], args[1]);
 		case "addcard":
 			return addCard(args[0], args[1], args[2], args[3]);
+		case "show":
+			return showCard(args[0]);
+		case "editcard":
+			return editCard(args[0], args[1], args[2]);
+		case "delcard":
+			return delCard(args[0]);
+		case "delconcept":
+			return delConcept(args[0], args[1]);
+		case "ungrade":
+			return ungrade(args[0]);
+		case "suspend":
+			return suspendCard(args[0], args[1]);
 		case "probe":
 			return probe(args[0], args[1], args[2], args[3]);
 		case "target":
@@ -607,15 +905,30 @@ function main() {
 			return listDue(args[0]);
 		case "grade":
 			return grade(args[0], args[1]);
+		case "note":
+			return addNote(args[0], args[1]);
+		case "sessions":
+			return listSessions(args[0]);
 		case "assess":
 			return assess(args[0], args[1]);
 		case "evaluate":
 			return evaluate(args[0], args[1], args[2], args[3]);
 		case "mastery":
 			return mastery(args[0]);
+		case "export":
+			return exportJson(args[0]);
+		case "doctor":
+			return doctor();
 		default:
 			console.log(
-				"Usage: bun src/learn-it.ts [resume|init|addconcept|concepts|advise|addcard|probe|target|due|grade|assess|evaluate|mastery]",
+				"Usage: bun src/learn-it.ts <command>\n" +
+					"  state:   resume | mastery <s> | export [s] | doctor\n" +
+					"  subject: init <s> | target <s> <tier> | concepts <s> | advise <stage> <s>\n" +
+					"  concept: addconcept <s> <c> | delconcept <s> <c>\n" +
+					"  cards:   addcard <s> <c> <q> <a> | show <id> | editcard <id> <q> <a> | delcard <id> | suspend <id> [on|off]\n" +
+					"  review:  due [s] | grade <id> <0-5> | ungrade <id>\n" +
+					"  assess:  probe <s> <c> <explain|apply> <0-100> | assess <s> [kind] | evaluate <s> <kind> <0-100> [file]\n" +
+					"  session: note <s> <summary> | sessions <s>",
 			);
 	}
 }
