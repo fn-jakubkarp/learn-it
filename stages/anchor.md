@@ -1,12 +1,23 @@
 ---
 stage: anchor
-phase: anchor
-gate: anchor
-description: "Memorize raw facts with mnemonics: memory palace, acronyms, or storytelling."
+phase: conceptualize
+gate: conceptualize
+description: "Optional: mnemonics (palace / acronym / story) for raw, un-deducible facts only."
 ---
 
-This is no longer a single general stage, but a router that launches specific, purpose-built tools for memorizing raw facts. You invoke it with a concrete intent:
+**Goal:** cheap recall hooks for **arbitrary** facts — syntax, names, magic numbers — that can't be reasoned out. Not a phase; an optional tool reachable any time.
 
-- **Palace** — the agent helps map a difficult list of concepts onto a physical space (e.g. your home).
-- **Acronyms** — generates memorable (often absurd or vulgar) acronyms for a specific piece of syntax.
-- **Storytelling** — links seemingly unrelated facts into a strange story, exploiting the fact that the brain encodes unusual images extremely well.
+**Guard — use sparingly.** Mnemonics are low-utility for conceptual material (Dunlosky) and can paper over missing understanding. If a fact can be *derived* or *understood*, send it to `concept` instead. Anchor only what is genuinely raw.
+
+## Tools (invoke by intent)
+- **Palace** — map an ordered list onto a familiar physical space (the rooms of your home).
+- **Acronym** — a vivid (often absurd) acronym for a fixed sequence of syntax.
+- **Story** — chain unrelated facts into one strange image; the brain encodes the bizarre well.
+
+Keep them vivid and short — a mnemonic longer than the fact it anchors is wasted.
+
+## NEVER
+- Mnemonic-ize conceptual material that deserves real understanding · force an anchor where none helps.
+
+## Hand-off
+Anchored → `extract` (the facts become cards like any other).

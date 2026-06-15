@@ -2,11 +2,25 @@
 stage: explore-topic
 phase: diagnose
 gate: diagnose
-description: Map the subject's territory into concepts before the learner is tested — so even gaps they can't name are on the map.
+description: Map the subject's territory into concepts before testing — so gaps the learner can't name are still on the map.
 ---
 
-The learner can't list what they don't know. Before any diagnosis, the agent maps the **territory** of the subject: what does mastering this actually require?
+**Goal:** the learner can't list what they don't know. Lay out the whole territory first, so even unnamed gaps land on the map. This concept list becomes what coverage and mastery are measured against.
 
-The agent lays out the landscape of the subject and breaks it into **concepts** (lesson-sized leaves), foundation-first. It also sketches what the upper tiers look like here — what a *proficient* vs an *expert* practitioner can do — so the learner sees the whole climb, not just the next step.
+**Inputs:** the subject and its `audit.md`.
 
-Output: a candidate concept list written to `roadmap.md` and registered with `addconcept "<subject>" "<concept>"`. This map is what `explore-gaps` probes the learner against, and what coverage and mastery are later measured on. It refines the learner's self-reported `audit.md` rather than trusting it.
+## Method
+1. Map what mastering this subject actually requires — foundation-first, in real dependency order.
+2. Break it into **concepts**: lesson-sized leaves ("ownership", "IP address types") — not subject-sized ("Rust"), not single facts.
+3. Sketch the climb: what a *proficient* vs an *expert* practitioner can do here — so the learner sees the whole mountain, not just the next step.
+4. Write the candidate list to `subjects/<subject>/roadmap.md` and register each:
+   ```bash
+   bun src/learn-it.ts addconcept "<subject>" "<concept>"
+   ```
+
+## NEVER
+- Trust the audit as the map — the audit refines into this, it doesn't define it.
+- Emit concepts too coarse to prove or too fine to be a lesson.
+
+## Hand-off
+Concepts registered → `explore-gaps` (probe the learner against this map).
