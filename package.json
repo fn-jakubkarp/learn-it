@@ -5,10 +5,12 @@
 	"private": true,
 	"scripts": {
 		"db:init": "bun src/init-db.ts",
+		"test": "bun test",
 		"check": "biome check",
 		"check:fix": "biome check --write",
 		"format": "biome format --write",
-		"typecheck": "tsc --noEmit"
+		"typecheck": "tsc --noEmit",
+		"verify": "biome check && tsc --noEmit && bun test"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^2.5.0",

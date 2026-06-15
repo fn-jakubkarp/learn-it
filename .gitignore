@@ -11,7 +11,9 @@ output/*
 !output/.gitkeep
 subjects/*
 !subjects/.gitkeep
+# the database plus its WAL sidecar files (-wal / -shm / -journal)
 data/*.db
+data/*.db-*
 
 # code coverage
 coverage

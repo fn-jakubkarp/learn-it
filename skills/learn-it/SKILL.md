@@ -34,6 +34,32 @@ bun src/learn-it.ts advise {stage} "{subject}"   # "OK (phase: ...)" or "NOTE: <
 
 It **never refuses**. On a `NOTE`, surface it ("you have 0 reviews — an exam now tests little"), then **honor the learner's choice**. There is no `advance` — phase follows reality.
 
+## Cards are one stream, not the point
+
+Most learning here is **conversation** — explaining, being probed, defending a build — not card drills. Run `probe`, `feynman`, `assess`/`evaluate` freely; a learner who never touches a flashcard can still climb to proficient on demonstrated evidence. Use flashcards for the raw, recall-able facts; use dialogue for everything else.
+
+## End a working session with a note
+
+Before you wrap up, capture continuity so the next session (which may be pure dialogue) resumes with context — not a cold start:
+
+```bash
+bun src/learn-it.ts note "{subject}" "{what was covered, where they struggled, what to revisit}"
+```
+
+`resume` shows the latest note per subject; `sessions "{subject}"` lists the history. Keep it to one or two sentences, concrete.
+
+## Managing material (fix mistakes, don't live with them)
+
+```bash
+bun src/learn-it.ts show {id}                 # see a card's stored Q + A + scheduling
+bun src/learn-it.ts editcard {id} "{q}" "{a}" # fix a typo (scheduling unchanged)
+bun src/learn-it.ts ungrade {id}              # undo the last grade (state is replayed back)
+bun src/learn-it.ts suspend {id} [on|off]     # pause a leech without losing its history
+bun src/learn-it.ts delcard {id}              # remove a card (and its recall log)
+```
+
+Use `show` to grade a recall against the **stored** answer rather than your own memory of it.
+
 ## Pin the grader (provenance)
 
 Every score comes from **you**, an LLM grader — the soft spot in "un-gameable" mastery. So **prefix every grading command with the model you are running as**, so each score records its own provenance and a weak/old grader can be spotted and re-graded:
