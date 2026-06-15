@@ -72,6 +72,26 @@ const server = Bun.serve({
 			);
 		}
 
+		// Record a concept exposure through a surface (read = recognition; explain/
+		// quiz = self-graded here, AI-graded in the /learn-it chat).
+		if (req.method === "POST" && pathname === "/api/expose") {
+			const body = (await req.json().catch(() => ({}))) as {
+				subject?: string;
+				concept?: string;
+				surface?: string;
+				quality?: number;
+			};
+			if (!body.subject || !body.concept || !body.surface)
+				return json({ error: "subject, concept, surface required" }, 400);
+			const args = ["expose", body.subject, body.concept, body.surface];
+			if (body.quality != null) args.push(String(body.quality));
+			const r = cli(args);
+			return json(
+				{ ok: r.ok, message: (r.out || r.err).trim() },
+				r.ok ? 200 : 500,
+			);
+		}
+
 		// Record a session note for continuity into the next session.
 		if (req.method === "POST" && pathname === "/api/note") {
 			const body = (await req.json().catch(() => ({}))) as {
