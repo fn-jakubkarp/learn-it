@@ -14,6 +14,7 @@ import {
 	EVIDENCE_BLOOM,
 	type EvidenceKind,
 	LONG_RETENTION_DAYS,
+	MATURE_INTERVAL_DAYS,
 	type MasterySignals,
 	PASS,
 	RETENTION_DAYS,
@@ -48,7 +49,6 @@ const auditTemplate = (name: string) =>
 const PHASE_KIND: Record<Phase, EvidenceKind> = {
 	diagnose: "explain",
 	conceptualize: "explain",
-	anchor: "apply",
 	recall: "apply",
 	space: "apply",
 	verify: "apply",
@@ -104,7 +104,7 @@ function readSignals(subject: SubjectRow): TopicSignals {
 		.query(
 			`SELECT COUNT(*) AS c,
               SUM(CASE WHEN repetitions >= 1 THEN 1 ELSE 0 END) AS r,
-              SUM(CASE WHEN interval >= 7 THEN 1 ELSE 0 END) AS m
+              SUM(CASE WHEN interval >= ${MATURE_INTERVAL_DAYS} THEN 1 ELSE 0 END) AS m
        FROM flashcards WHERE subject_id = ?`,
 		)
 		.get(subject.id) as { c: number; r: number | null; m: number | null };
@@ -346,8 +346,9 @@ function assess(subjectName?: string, kindArg?: string) {
 		return console.log(`Missing template: ${tmplPath}`);
 
 	const m = assessMastery(masterySignals(subject));
+	// Weakest first: highest FSRS difficulty (the cards fighting back hardest).
 	const due = [...getDueCards(db, subjectName)].sort(
-		(a, b) => a.ease_factor - b.ease_factor,
+		(a, b) => b.difficulty - a.difficulty,
 	);
 	const weakest = due.slice(0, 5).map((c) => c.question);
 	const focus = [

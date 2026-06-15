@@ -5,7 +5,7 @@ gate: diagnose
 description: Probe the learner against the concept map to find real gaps and place them at their true level — not always novice.
 ---
 
-A placement diagnostic, not a self-report. People mis-estimate their own knowledge (Dunning-Kruger), so the agent **tests** the learner across the concept map at rising difficulty — like adaptive testing, pushing until they fall off. The point is two-fold: find the real gaps, and place an existing practitioner at their true level instead of starting everyone at novice.
+A placement diagnostic, not a self-report. Self-assessment correlates weakly with real skill — people can't reliably rank what they don't yet know — so the agent **tests** the learner across the concept map at rising difficulty, like adaptive testing, pushing until they fall off. The point is two-fold: find the real gaps, and place an existing practitioner at their true level instead of starting everyone at novice.
 
 For each concept worth checking, the agent poses an `explain` or `apply` prompt and scores it against the matching rubric, then records concept-level evidence:
 

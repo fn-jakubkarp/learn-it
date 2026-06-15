@@ -1,6 +1,6 @@
 ---
 name: learn-it
-description: Cognitive learning engine -- subjects broken into concepts, a watcher that tracks many subjects at once, an SM-2 scheduler, and harsh per-subject mastery scored from logged performance. Tools, not rails.
+description: Cognitive learning engine -- subjects broken into concepts, a watcher that tracks many subjects at once, an FSRS scheduler, and harsh per-subject mastery scored from logged performance. Tools, not rails.
 arguments: stage
 user_invocable: true
 argument-hint: "[ (no args = resume) | init | explore-topic | explore-gaps | plan | concept | anchor | extract | review | feynman | exam | assess | evaluate | mastery ]"
@@ -12,7 +12,7 @@ Learn-it gives the learner **proper tools and a watcher**, not a railroad.
 
 **Structure (2-tier):** a **subject** is the thing you master ("Rust", "Networking") — it carries the roadmap, the phase, and the Dreyfus mastery tier. A **concept** is a lesson-sized leaf under it ("ownership", "IP address types") — cards attach to concepts; a concept is retained-or-not, it has no tier of its own. The roadmap IS the concept list.
 
-The phases (`diagnose -> conceptualize -> anchor -> recall -> space -> verify -> mastered`) are a **map**, not a locked sequence. The learner can:
+The phases (`diagnose -> conceptualize -> recall -> space -> verify -> mastered`) are a **map**, not a locked sequence (`anchor` is an optional tool, not a phase — mnemonics for raw facts only). The learner can:
 
 - run **several subjects at once**, each at its own phase;
 - run **any stage on demand** — nothing is blocked;
@@ -68,6 +68,8 @@ bun src/learn-it.ts evaluate "{subject}" <explain|apply|build> <score 0-100> [fi
 
 Score each rubric dimension (see `templates/rubric/{kind}.md`) — do not invent your own scale. `>= 70` passes. This logs evidence that feeds mastery; a passing **build** is required to reach expert.
 
+**Grade as a skeptic, not a fan.** You default to agreeing with the learner — that sycophancy is exactly what makes a self-graded score worthless. Every rubric opens with a *refute-first* step: attack the answer before you score it, and score only what survives. **For any evidence that would promote a tier** (a `build`, an `explain` at the expert gate, or an `apply` scoring 90+), grade it **twice, independently, and record the lower score** — a second skeptical pass is cheap insurance against a number that unlocks expert.
+
 ## Mastery & rewards (earned, harsh, honest)
 
 Mastery is computed in the database from logged performance (`reviews` + `evidence`) — never self-reported, so it cannot be gamed. Tiers follow the Dreyfus ladder and are **brutal by design**: volume never lifts a tier. Climbing needs proven retention (concepts recalled after long gaps) and higher-Bloom evidence — and **expert is unreachable without a real build**.
@@ -111,12 +113,13 @@ bun src/learn-it.ts mastery "{subject}"     # tier, % to next tier, exactly what
   ```
 
 ### /learn-it review [subject]
-- **Action**: Read `stages/review.md`. With no subject the queue interleaves every subject's due cards. One at a time, grade the typed answer 0-5:
+- **Action**: Read `stages/review.md`. The `due` queue is **interleaved across both subjects and concepts** (consecutive cards come from different concepts where possible — that contextual interference is deliberate). One at a time, grade the typed answer 0-5:
   ```bash
   bun src/learn-it.ts due ["{subject}"]
   bun src/learn-it.ts grade {cardId} {0-5}
   ```
 - **Rule**: the learner must type a full answer. No "I know this" shortcuts.
+- **On a miss (grade < 3): teach, don't just reschedule.** Before the next card, give short *elaborative* feedback — why the answer was wrong, the correct mental model, and a cue that discriminates this card from the one it was confused with. A bare "wrong, next" wastes the most valuable moment in the loop (corrective feedback is one of the highest-leverage interventions there is). Keep it tight; then move on.
 
 ### /learn-it feynman {subject}
 - **Action**: Read `stages/feynman.md`. Reverse roles: the learner teaches, you play the novice and probe gaps. Record it as explain evidence:
