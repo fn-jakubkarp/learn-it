@@ -5,6 +5,7 @@
 	"private": true,
 	"scripts": {
 		"db:init": "bun src/init-db.ts",
+		"dashboard": "bun src/dashboard.ts",
 		"test": "bun test",
 		"check": "biome check",
 		"check:fix": "biome check --write",

@@ -76,6 +76,8 @@ Flashcards are **one** stream, never the whole tool — mastery is medium-agnost
 
 `export` emits the full learner state as JSON (subjects, tiers, phases, concepts, cards + FSRS state, evidence, sessions, due counts) on stdout. It is the read surface an external dashboard consumes — the engine still owns the database; the dashboard only reads. `doctor` is the matching health check (schema, pragmas, grader provenance, orphans).
 
+`src/dashboard.ts` is a dependency-free, build-free dashboard: `bun src/dashboard.ts` runs a `Bun.serve` HTTP server (default `:4321`) that serves one static page (`src/dashboard.html`) and a tiny JSON API which **shells out to the same CLI** — `export` for live state, `grade`/`note` for writes. So it adds no new source of truth and stays consistent with every CLI command; each request re-reads the database, so the watcher is always live. Card grades from the dashboard are self-graded recall practice, logged with `grader = "dashboard"` so they're distinguishable from AI-graded assessments in a provenance audit — tier-moving evidence still comes through the AI-graded assessment loop.
+
 ## Honest limits
 
 A chat CLI can't observe study that happens outside the conversation, and can't fully prevent a looked-up answer or a borrowed artifact. The agent acts as a witness/examiner — it credits only what's demonstrated to it, and probing ("why X? what breaks if Y?") makes evidence hard to fake — but this is mitigation, not proof.

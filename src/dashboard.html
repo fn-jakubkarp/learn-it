@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>learn-it</title>
+		<style>
+			:root {
+				--bg: #0e1116;
+				--panel: #161b22;
+				--panel-2: #1c232d;
+				--line: #2a313c;
+				--text: #e6edf3;
+				--dim: #8b949e;
+				--accent: #4493f8;
+				--good: #3fb950;
+				--warn: #d29922;
+				--bad: #f85149;
+			}
+			* { box-sizing: border-box; }
+			body {
+				margin: 0;
+				background: var(--bg);
+				color: var(--text);
+				font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+			}
+			code, .mono { font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+			header {
+				display: flex;
+				align-items: baseline;
+				gap: 16px;
+				padding: 18px 24px;
+				border-bottom: 1px solid var(--line);
+				position: sticky;
+				top: 0;
+				background: var(--bg);
+				z-index: 5;
+			}
+			header h1 { font-size: 18px; margin: 0; letter-spacing: 0.3px; }
+			header h1 .brand { color: var(--accent); }
+			header .due { color: var(--dim); font-size: 14px; }
+			header .spacer { flex: 1; }
+			button {
+				font: inherit;
+				cursor: pointer;
+				border: 1px solid var(--line);
+				background: var(--panel-2);
+				color: var(--text);
+				border-radius: 7px;
+				padding: 7px 12px;
+			}
+			button:hover { border-color: var(--accent); }
+			.layout {
+				display: grid;
+				grid-template-columns: 1fr 1fr;
+				gap: 20px;
+				padding: 20px 24px;
+				max-width: 1200px;
+				margin: 0 auto;
+			}
+			@media (max-width: 820px) { .layout { grid-template-columns: 1fr; } }
+			h2.section {
+				font-size: 12px;
+				text-transform: uppercase;
+				letter-spacing: 1px;
+				color: var(--dim);
+				margin: 0 0 12px;
+			}
+			.subject {
+				background: var(--panel);
+				border: 1px solid var(--line);
+				border-radius: 10px;
+				padding: 14px 16px;
+				margin-bottom: 12px;
+			}
+			.subject .top { display: flex; align-items: center; gap: 10px; }
+			.subject .name { font-weight: 600; font-size: 16px; }
+			.subject .spacer { flex: 1; }
+			.badge {
+				font-size: 12px;
+				padding: 2px 9px;
+				border-radius: 20px;
+				border: 1px solid var(--line);
+				white-space: nowrap;
+			}
+			.tier-novice { color: #adbac7; }
+			.tier-advanced-beginner { color: #6cb6ff; border-color: #1f6feb44; }
+			.tier-competent { color: #56d4bc; border-color: #1f6f6b44; }
+			.tier-proficient { color: #b083f0; border-color: #6e40c944; }
+			.tier-expert { color: #e3b341; border-color: #9e6a0344; }
+			.bar { height: 6px; background: var(--panel-2); border-radius: 4px; margin: 10px 0 8px; overflow: hidden; }
+			.bar > span { display: block; height: 100%; background: var(--accent); }
+			.meta { font-size: 13px; color: var(--dim); display: flex; flex-wrap: wrap; gap: 4px 14px; }
+			.meta b { color: var(--text); font-weight: 600; }
+			.blocking { font-size: 13px; color: var(--warn); margin-top: 8px; }
+			.note { font-size: 13px; color: var(--dim); margin-top: 8px; border-left: 2px solid var(--line); padding-left: 10px; }
+			.duepill { background: var(--accent); color: #04101f; font-weight: 600; border: none; }
+			.duepill.zero { background: var(--panel-2); color: var(--dim); }
+
+			/* review */
+			.review { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px; position: sticky; top: 80px; }
+			.review .controls { display: flex; gap: 10px; align-items: center; margin-bottom: 14px; }
+			select { font: inherit; background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: 7px; padding: 6px 9px; }
+			.card { background: var(--panel-2); border: 1px solid var(--line); border-radius: 9px; padding: 20px; min-height: 130px; }
+			.card .where { font-size: 12px; color: var(--dim); margin-bottom: 10px; }
+			.card .q { font-size: 18px; font-weight: 600; }
+			.card .a { margin-top: 16px; padding-top: 14px; border-top: 1px dashed var(--line); color: #c9d4e0; white-space: pre-wrap; }
+			.grades { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 14px; }
+			.grades button { padding: 10px 0; }
+			.g-again { border-color: #f8514944; }
+			.g-again:hover { border-color: var(--bad); }
+			.g-good:hover, .g-easy:hover { border-color: var(--good); }
+			.hint { font-size: 12px; color: var(--dim); margin-top: 12px; }
+			.empty { color: var(--dim); text-align: center; padding: 30px 10px; }
+			.banner { background: #2d1618; border: 1px solid var(--bad); color: #ffb4ab; padding: 12px 16px; border-radius: 9px; margin: 16px 24px; }
+			.flash { color: var(--good); font-size: 13px; min-height: 18px; margin-top: 8px; }
+		</style>
+	</head>
+	<body>
+		<header>
+			<h1><span class="brand">learn-it</span> dashboard</h1>
+			<span class="due" id="dueTotal"></span>
+			<span class="spacer"></span>
+			<span class="due" id="updated"></span>
+			<button id="refresh">↻ Refresh</button>
+		</header>
+
+		<div id="banner"></div>
+
+		<div class="layout">
+			<section>
+				<h2 class="section">Subjects &amp; topics — watcher</h2>
+				<div id="subjects"></div>
+			</section>
+
+			<section>
+				<h2 class="section">Review — flashcards due</h2>
+				<div class="review">
+					<div class="controls">
+						<label for="subjectFilter" class="due">Subject:</label>
+						<select id="subjectFilter"><option value="">All</option></select>
+						<span class="spacer" style="flex:1"></span>
+						<span class="due" id="queueCount"></span>
+					</div>
+					<div id="reviewBody"></div>
+					<div class="flash" id="flash"></div>
+					<div class="hint">
+						Self-graded recall practice — logged with grader
+						<code>dashboard</code>. Tiers are still earned through AI-graded
+						assessments, not these buttons.
+					</div>
+				</div>
+			</section>
+		</div>
+
+		<script>
+			const GRADES = [
+				{ label: "Again", q: 1, cls: "g-again" },
+				{ label: "Hard", q: 3, cls: "g-hard" },
+				{ label: "Good", q: 4, cls: "g-good" },
+				{ label: "Easy", q: 5, cls: "g-easy" },
+			];
+			let state = null;
+			let queue = [];
+			let idx = 0;
+			let revealed = false;
+
+			const $ = (id) => document.getElementById(id);
+			const esc = (s) =>
+				String(s ?? "").replace(/[&<>]/g, (c) =>
+					({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c],
+				);
+
+			async function load() {
+				$("banner").innerHTML = "";
+				let res;
+				try {
+					res = await fetch("/api/state");
+				} catch (e) {
+					return showError("Server unreachable.");
+				}
+				const data = await res.json();
+				if (!res.ok || data.error)
+					return showError(
+						(data.error || "Failed to load.") +
+							"  (Have you run `bun src/init-db.ts`?)",
+					);
+				state = data;
+				renderSubjects();
+				buildQueue();
+				renderReview();
+				const total = state.subjects.reduce((n, s) => n + (s.dueCount || 0), 0);
+				$("dueTotal").textContent = total + " due today";
+				$("updated").textContent = "as of " + state.generated;
+			}
+
+			function showError(msg) {
+				$("banner").innerHTML = '<div class="banner">' + esc(msg) + "</div>";
+			}
+
+			function renderSubjects() {
+				const el = $("subjects");
+				if (!state.subjects.length) {
+					el.innerHTML =
+						'<div class="empty">No subjects yet. Start one from the CLI: <code>bun src/learn-it.ts init "rust"</code></div>';
+					return;
+				}
+				el.innerHTML = state.subjects
+					.map((s) => {
+						const pct = s.tier === "expert" ? 100 : s.withinTier || 0;
+						const next =
+							s.tier === "expert" ? "maxed ★" : pct + "% to next tier";
+						const block = s.blocking && s.blocking.length
+							? '<div class="blocking">⤷ ' + esc(s.blocking[0]) + "</div>"
+							: "";
+						const sess = s.sessions && s.sessions.length
+							? '<div class="note">last session: ' +
+								esc(s.sessions[0].summary) +
+								"</div>"
+							: "";
+						const duecls = s.dueCount ? "" : " zero";
+						return (
+							'<div class="subject">' +
+							'<div class="top">' +
+							'<span class="name">' + esc(s.name) + "</span>" +
+							'<span class="badge tier-' + s.tier + '">' + esc(s.tier) + "</span>" +
+							'<span class="spacer"></span>' +
+							'<span class="badge duepill' + duecls + '">' +
+							(s.dueCount || 0) + " due</span>" +
+							"</div>" +
+							'<div class="bar"><span style="width:' + pct + '%"></span></div>' +
+							'<div class="meta">' +
+							"<span>" + next + "</span>" +
+							"<span>phase <b>" + esc(s.phase) + "</b></span>" +
+							(s.target ? "<span>target <b>" + esc(s.target) + "</b></span>" : "") +
+							"<span>concepts <b>" + (s.concepts ? s.concepts.length : 0) + "</b></span>" +
+							'<span><a href="#" style="color:var(--accent)" onclick="addNote(\'' +
+							encodeURIComponent(s.name) + "'); return false;\">+ note</a></span>" +
+							"</div>" +
+							block +
+							sess +
+							"</div>"
+						);
+					})
+					.join("");
+			}
+
+			function buildQueue() {
+				const filter = $("subjectFilter").value;
+				const today = state.generated;
+				const rows = [];
+				for (const s of state.subjects) {
+					if (filter && s.name !== filter) continue;
+					const cmap = {};
+					for (const c of s.concepts || []) cmap[c.id] = c.name;
+					for (const c of s.cards || []) {
+						if (c.suspended) continue;
+						if (c.next_review > today) continue;
+						rows.push({
+							id: c.id,
+							subject: s.name,
+							concept: cmap[c.concept_id] || "",
+							question: c.question,
+							answer: c.answer,
+							next_review: c.next_review,
+						});
+					}
+				}
+				rows.sort((a, b) => (a.next_review < b.next_review ? -1 : 1));
+				queue = rows;
+				idx = 0;
+				revealed = false;
+				// keep the subject dropdown in sync with available subjects
+				const sel = $("subjectFilter");
+				if (sel.options.length <= 1 && state.subjects.length) {
+					for (const s of state.subjects) {
+						const o = document.createElement("option");
+						o.value = s.name;
+						o.textContent = s.name;
+						sel.appendChild(o);
+					}
+				}
+			}
+
+			function renderReview() {
+				$("queueCount").textContent = queue.length
+					? idx + 1 + " / " + queue.length
+					: "";
+				const body = $("reviewBody");
+				if (!queue.length) {
+					body.innerHTML =
+						'<div class="empty">No cards due. Nicely done — come back when something resurfaces.</div>';
+					return;
+				}
+				const card = queue[idx];
+				let html =
+					'<div class="card">' +
+					'<div class="where">' +
+					esc(card.subject) +
+					(card.concept ? " · " + esc(card.concept) : "") +
+					"</div>" +
+					'<div class="q">' + esc(card.question) + "</div>";
+				if (revealed) html += '<div class="a">' + esc(card.answer) + "</div>";
+				html += "</div>";
+				if (!revealed) {
+					html +=
+						'<div class="grades"><button style="grid-column:1/-1" onclick="reveal()">Reveal answer</button></div>';
+				} else {
+					html +=
+						'<div class="grades">' +
+						GRADES.map(
+							(g) =>
+								'<button class="' + g.cls + '" onclick="grade(' + g.q + ')">' +
+								g.label + "</button>",
+						).join("") +
+						"</div>";
+				}
+				body.innerHTML = html;
+			}
+
+			function reveal() {
+				revealed = true;
+				renderReview();
+			}
+
+			async function grade(quality) {
+				const card = queue[idx];
+				if (!card) return;
+				const res = await fetch("/api/grade", {
+					method: "POST",
+					headers: { "content-type": "application/json" },
+					body: JSON.stringify({ id: card.id, quality }),
+				});
+				const data = await res.json();
+				$("flash").textContent = data.ok ? data.message : "Error: " + data.error;
+				// reload live state so tiers + due counts update, then continue the queue
+				const wasFilter = $("subjectFilter").value;
+				await load();
+				$("subjectFilter").value = wasFilter;
+				buildQueue();
+				renderReview();
+			}
+
+			async function addNote(encName) {
+				const name = decodeURIComponent(encName);
+				const summary = prompt("Session note for " + name + ":");
+				if (!summary) return;
+				const res = await fetch("/api/note", {
+					method: "POST",
+					headers: { "content-type": "application/json" },
+					body: JSON.stringify({ subject: name, summary }),
+				});
+				const data = await res.json();
+				$("flash").textContent = data.ok ? "Note saved." : "Error: " + data.error;
+				load();
+			}
+
+			$("refresh").onclick = load;
+			$("subjectFilter").onchange = () => {
+				buildQueue();
+				renderReview();
+			};
+			load();
+		</script>
+	</body>
+</html>

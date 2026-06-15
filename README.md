@@ -133,12 +133,14 @@ Cards are **one** stream, not the point. Most real learning here happens by *tal
 
 - **Session notes.** At the end of a working session the mentor records what you covered, where you struggled, and what to revisit (`note`); the dashboard and `resume` surface the latest one, so the next session — even a pure back-and-forth with no card review — picks up with context instead of starting cold.
 - **Manage your own material.** `show`, `editcard`, `delcard`, `delconcept`, `suspend` (pause a leech), and `ungrade` (undo a mis-grade — the recall log is replayed to restore exact state).
-- **A dashboard surface.** `export` dumps your full state as JSON (subjects, tiers, phases, cards + scheduling, evidence, sessions) for an external viewer to render; `doctor` checks the database's health. The engine owns the data — the dashboard only reads it.
+- **A dashboard.** `bun src/dashboard.ts` serves a tiny local web dashboard (no build, no dependencies) at `http://localhost:4321`: every subject with its tier, phase, due count, and last session note (the stateful watcher), plus a flashcard review engine — read a question, reveal the answer, rate it, and the card reschedules. Under the hood it just calls the same CLI, so the engine still owns the data. (Card grades there are self-graded practice, logged as grader `dashboard`; tiers are still earned through AI-graded assessments.)
+- **Or wire your own.** `export` dumps your full state as JSON; `doctor` checks the database's health.
 
 ```bash
+bun src/dashboard.ts                              # open http://localhost:4321
 bun src/learn-it.ts note "rust" "Covered ownership + moves; shaky on lifetimes. Next: borrow checker."
-bun src/learn-it.ts export "rust" > rust.json   # feed a dashboard
-bun src/learn-it.ts doctor                        # health check
+bun src/learn-it.ts export "rust" > rust.json     # raw JSON for your own viewer
+bun src/learn-it.ts doctor                         # health check
 ```
 
 ## ⚙️ The Engine

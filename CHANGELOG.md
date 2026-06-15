@@ -41,6 +41,13 @@ pre-1.0, so the public surface may still shift.
   dashboard consumes (the engine still owns the database).
 - **`doctor`** health check: schema, pragmas, grader provenance, orphan/suspended
   counts.
+- **Local web dashboard** (`bun src/dashboard.ts`, default `:4321`): a stateful
+  watcher (every subject's tier, phase, due count, blocking item, last session
+  note) plus a flashcard review engine (reveal → rate → reschedule). Zero
+  dependencies, no build step — a `Bun.serve` server over one static page whose
+  JSON API shells out to the existing CLI (`export` to read, `grade`/`note` to
+  write). Dashboard card grades log `grader = "dashboard"` (self-graded practice,
+  distinct from AI-graded assessments).
 - **Test suite** (`bun test`) for the scheduler, mastery ladder, and lifecycle —
   including the anti-grind invariant and the expert-gate boundaries — plus a CI
   workflow running Biome + `tsc` + tests on every push and PR.
