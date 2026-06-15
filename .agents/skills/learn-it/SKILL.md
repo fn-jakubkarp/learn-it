@@ -68,6 +68,8 @@ bun src/learn-it.ts evaluate "{subject}" <explain|apply|build> <score 0-100> [fi
 
 Score each rubric dimension (see `templates/rubric/{kind}.md`) — do not invent your own scale. `>= 70` passes. This logs evidence that feeds mastery; a passing **build** is required to reach expert.
 
+**Grade as a skeptic, not a fan.** You default to agreeing with the learner — that sycophancy is exactly what makes a self-graded score worthless. Every rubric opens with a *refute-first* step: attack the answer before you score it, and score only what survives. **For any evidence that would promote a tier** (a `build`, an `explain` at the expert gate, or an `apply` scoring 90+), grade it **twice, independently, and record the lower score** — a second skeptical pass is cheap insurance against a number that unlocks expert.
+
 ## Mastery & rewards (earned, harsh, honest)
 
 Mastery is computed in the database from logged performance (`reviews` + `evidence`) — never self-reported, so it cannot be gamed. Tiers follow the Dreyfus ladder and are **brutal by design**: volume never lifts a tier. Climbing needs proven retention (concepts recalled after long gaps) and higher-Bloom evidence — and **expert is unreachable without a real build**.
