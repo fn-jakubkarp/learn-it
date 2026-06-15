@@ -6,7 +6,7 @@ See `docs/ARCHITECTURE.md` for the design. (Design rationale / decision history 
 
 ## Core invariants — do not regress these
 
-- **Mastery is computed from logged performance** (`reviews` + `evidence` tables), never self-reported. Gaming your own score is the illusion of competence the tool exists to defeat. It lives in `data/*.db`, not in markdown.
+- **Mastery is computed from logged performance** (`reviews` + `evidence` tables), never self-reported. Gaming your own score is the illusion of competence the tool exists to defeat. It lives in `data/*.db`, not in markdown. Retention is measured against **real elapsed time** (`flashcards.last_reviewed`), so grading a card repeatedly the same day can't manufacture "proven" — a 0-day gap moves nothing.
 - **The watcher advises, never blocks.** Phase is *inferred* from real state (`src/lifecycle.ts`), not a stored cursor. Tools + a watcher, not rails.
 - **2-tier structure.** A *subject* carries the Dreyfus tier; a *concept* is a leaf (cards attach to it, no tier). The roadmap is the concept list; mastery rolls up from concepts.
 - **Mastery is medium-agnostic and harsh.** Flashcards are one stream. A concept is "proven" by retention OR demonstrated evidence. Volume never lifts a tier. **Expert requires a real build + durability** (long retention or evidence over time). A single diagnostic places at most *proficient* — placement is earned via `probe`, never declared.
@@ -16,5 +16,6 @@ See `docs/ARCHITECTURE.md` for the design. (Design rationale / decision history 
 
 - **Data hygiene:** `subjects/` and `output/` keep only their `.gitkeep` in the repo; never commit user data. Examples live in `examples/`. Never delete a `.gitkeep`.
 - **Commits:** small and logical (one concern each). Branch off `main`, merge after the user approves, push only when asked.
-- **Verify before committing:** `bunx biome check` (exit 0) and `bunx tsc --noEmit` must be clean.
-- **Run:** `bun src/init-db.ts` then `bun src/learn-it.ts <cmd>` (resume|init|explore-topic|explore-gaps|plan|addconcept|addcard|probe|target|due|grade|assess|evaluate|mastery).
+- **Verify before committing:** `bun run verify` — `bunx biome check` (exit 0), `bunx tsc --noEmit`, and `bun test` must all be clean. Touching the scheduler / mastery / lifecycle? Add or update a test.
+- **Run:** `bun src/init-db.ts` then `bun src/learn-it.ts <cmd>`. **CLI commands** (router cases): `resume`, `init`, `addconcept`, `concepts`, `delconcept`, `advise`, `addcard`, `show`, `editcard`, `delcard`, `suspend`, `probe`, `target`, `due`, `grade`, `ungrade`, `note`, `sessions`, `assess`, `evaluate`, `mastery`, `export`, `doctor`. **Agent stages** (markdown prompts the skill reads, NOT CLI subcommands): `explore-topic`, `explore-gaps`, `plan`, `concept`, `anchor`, `extract`, `review`, `feynman`, `exam` — these decompose into the CLI commands above. Don't conflate the two.
+- **Skill:** `skills/learn-it/SKILL.md` is the canonical router (symlinked into `.claude/skills/learn-it/` for project discovery; auto-discovered under `skills/` when installed as a plugin via `.claude-plugin/plugin.json`).

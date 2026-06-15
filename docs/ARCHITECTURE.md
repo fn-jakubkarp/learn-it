@@ -15,8 +15,8 @@ The **roadmap is the concept list**. Coverage and mastery roll up from concepts,
 
 | File | Role |
 |------|------|
-| `init-db.ts` | SQLite schema: `subjects`, `concepts`, `flashcards`, append-only `reviews`, `evidence`. |
-| `scheduler.ts` | FSRS spaced repetition; every grade logs a `reviews` row with the interval the card survived. |
+| `init-db.ts` | SQLite schema: `subjects`, `concepts`, `flashcards`, append-only `reviews`, `evidence`, `sessions`. Enforces foreign keys + WAL; idempotent column migrations. |
+| `scheduler.ts` | FSRS spaced repetition; every grade logs a `reviews` row with the **real elapsed days** the card survived (`today − last_reviewed`), so retention can't be faked by same-day grading. `replayCard` powers `ungrade`. |
 | `mastery.ts` | Dreyfus tiers computed from logged performance (no volume credit). |
 | `lifecycle.ts` | Phase **map** (diagnose→…→mastered); infers phase from real state, advises but never blocks. |
 | `learn-it.ts` | CLI router: dashboard, concepts, cards, probe, assess/evaluate, mastery, target. |
@@ -33,7 +33,7 @@ diagnose → conceptualize → recall → space → verify → mastered
 - **Inferred phase.** Audit filled? concepts planned? cards? reviews? applied evidence? → the phase follows.
 - **Many subjects at once**, each at its own phase. The review queue interleaves due cards across all of them.
 
-Stages live as prompts in `stages/*.md`; the skill router is `.agents/skills/learn-it/SKILL.md`.
+Stages live as prompts in `stages/*.md`; the skill router is `skills/learn-it/SKILL.md` (symlinked into `.claude/skills/learn-it/` for project-skill discovery, and packaged as a plugin via `.claude-plugin/plugin.json`).
 
 ## Diagnose before you teach
 
@@ -65,6 +65,16 @@ assess (issue from template) → learner submits → evaluate (score vs rubric) 
 - `subjects/<subject>/assessments/<date>-<kind>.md` — the issued task, the submission, and the result.
 
 A `build` is the milestone tier — a small but real artifact, interrogated before scoring; the only path to the evidence an expert rating requires.
+
+## Two streams + session continuity
+
+Flashcards are **one** stream, never the whole tool — mastery is medium-agnostic, and the highest-Bloom evidence comes from *talking*: explaining, applying, building. So the engine carries a **conversational stream** alongside cards:
+
+- **`note` / `sessions`** — at the end of a working session the mentor writes a short note to the `sessions` table (what was covered, where the learner struggled, what to revisit). `resume` surfaces the latest per subject, so the next session — which may be pure dialogue, not a card review — picks up with context instead of cold-starting. These are engine State (LLM-authored, computed from what happened), distinct from the learner-authored `subjects/<s>/notes.md`.
+
+## Dashboard wiring
+
+`export` emits the full learner state as JSON (subjects, tiers, phases, concepts, cards + FSRS state, evidence, sessions, due counts) on stdout. It is the read surface an external dashboard consumes — the engine still owns the database; the dashboard only reads. `doctor` is the matching health check (schema, pragmas, grader provenance, orphans).
 
 ## Honest limits
 

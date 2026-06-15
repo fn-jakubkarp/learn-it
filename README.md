@@ -34,7 +34,7 @@ Learn-it is built around a 6-step framework based on how the human brain natural
 
 ### 5. Spaced Repetition
 * **Consolidate knowledge:** Memory is formed through the process of forgetting and remembering. 
-* **Optimized intervals:** Learn-it schedules with **FSRS** — the algorithm Anki now ships by default. Rather than fixed steps, it models each card's memory *stability* and *difficulty* and sets the next review for the day your recall probability is predicted to fall to a target (~90%) — so each review lands right as you're about to forget.
+* **Optimized intervals:** Learn-it schedules with **FSRS** — the modern successor to SM-2 that Anki adopted as its default. Rather than fixed steps, it models each card's memory *stability* and *difficulty* and sets the next review for the day your recall probability is predicted to fall to a target (~90%) — so each review lands right as you're about to forget. (It uses FSRS v4's published default weights, not yet fitted to your own history, so that ~90% is an approximate target.) Crucially, the model uses the **real time elapsed** since your last review, so grinding a card the same day moves nothing — only genuine retention across real gaps counts.
 
 ### 6. Brutal Verification & Transfer
 * **Real-world scenarios:** Try to explain the topic simply, applying it to real-life examples (The Feynman Technique). 
@@ -127,17 +127,32 @@ assess (issue from template) → you submit → evaluate (score vs rubric) → e
 
 `build` is the milestone tier — a small but real artifact, interrogated before it's scored. It's the only path to the evidence an `expert` rating requires.
 
+## 💬 More than flashcards
+
+Cards are **one** stream, not the point. Most real learning here happens by *talking* — explaining a concept back, getting probed on a new problem, defending a build. So the engine keeps a **conversational stream** beside the cards:
+
+- **Session notes.** At the end of a working session the mentor records what you covered, where you struggled, and what to revisit (`note`); the dashboard and `resume` surface the latest one, so the next session — even a pure back-and-forth with no card review — picks up with context instead of starting cold.
+- **Manage your own material.** `show`, `editcard`, `delcard`, `delconcept`, `suspend` (pause a leech), and `ungrade` (undo a mis-grade — the recall log is replayed to restore exact state).
+- **A dashboard surface.** `export` dumps your full state as JSON (subjects, tiers, phases, cards + scheduling, evidence, sessions) for an external viewer to render; `doctor` checks the database's health. The engine owns the data — the dashboard only reads it.
+
+```bash
+bun src/learn-it.ts note "rust" "Covered ownership + moves; shaky on lifetimes. Next: borrow checker."
+bun src/learn-it.ts export "rust" > rust.json   # feed a dashboard
+bun src/learn-it.ts doctor                        # health check
+```
+
 ## ⚙️ The Engine
 
 | File | Role |
 |------|------|
-| `src/learn-it.ts` | Session router — dashboard, watcher, concepts, cards, assess/evaluate, mastery. |
+| `src/learn-it.ts` | Session router — dashboard, watcher, concepts, cards, assess/evaluate, mastery, session notes, `export`, `doctor`. |
 | `src/lifecycle.ts` | The phase map: infers a subject's phase and advises (never blocks). |
-| `src/scheduler.ts` | FSRS spaced-repetition core; logs every recall to `reviews`. |
+| `src/scheduler.ts` | FSRS spaced-repetition core; logs every recall to `reviews` against **real elapsed time**. |
 | `src/mastery.ts` | Dreyfus tiers, rolled up over concepts + evidence (no volume credit). |
-| `src/init-db.ts` | Creates the SQLite schema. |
-| `data/learn_it.db` | `subjects`, `concepts`, `flashcards`, the append-only `reviews` log, and `evidence`. |
+| `src/init-db.ts` | Creates / migrates the SQLite schema (FKs + WAL on). |
+| `data/learn_it.db` | `subjects`, `concepts`, `flashcards`, the append-only `reviews` log, `evidence`, and `sessions`. |
 | `stages/*.md`, `templates/*` | Stage instructions and fixed assessment/rubric structures. |
+| `skills/learn-it/SKILL.md` | The `/learn-it` skill that drives the CLI conversationally. |
 
 ## 💻 Getting Started
 
