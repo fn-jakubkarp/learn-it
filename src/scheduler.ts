@@ -185,7 +185,12 @@ export function getDueCards(db: Database, subjectName?: string): CardRow[] {
 	return interleaveByConcept(rows);
 }
 
-export function gradeCard(db: Database, cardId: number, quality: number) {
+export function gradeCard(
+	db: Database,
+	cardId: number,
+	quality: number,
+	grader = "unpinned",
+) {
 	const card = db.query("SELECT * FROM flashcards WHERE id = ?").get(cardId) as
 		| CardRow
 		| undefined;
@@ -215,9 +220,10 @@ export function gradeCard(db: Database, cardId: number, quality: number) {
 	);
 
 	// Log the recall. interval_before is the gap this card just survived — the
-	// proof that mastery scoring relies on (see src/mastery.ts).
+	// proof that mastery scoring relies on (see src/mastery.ts). grader names the
+	// model that judged it, so the recall is auditable.
 	db.run(
-		"INSERT INTO reviews (card_id, concept_id, subject_id, quality, interval_before, interval_after) VALUES (?, ?, ?, ?, ?, ?)",
+		"INSERT INTO reviews (card_id, concept_id, subject_id, quality, interval_before, interval_after, grader) VALUES (?, ?, ?, ?, ?, ?, ?)",
 		[
 			cardId,
 			card.concept_id,
@@ -225,6 +231,7 @@ export function gradeCard(db: Database, cardId: number, quality: number) {
 			quality,
 			card.interval,
 			next.interval,
+			grader,
 		],
 	);
 

@@ -45,6 +45,12 @@ interface ConceptRow {
 const auditTemplate = (name: string) =>
 	`# Audit: ${name}\n\n## Knowledge Gaps\n- [ ] ...\n`;
 
+// The model that produced a score, recorded on every grade so harsh-mastery is
+// reproducible and auditable. Set once per session (e.g.
+// LEARN_IT_GRADER=claude-opus-4-8); when unset it logs 'unpinned' rather than
+// NULL, so a score with no provenance shows up in an audit instead of hiding.
+const grader = (): string => process.env.LEARN_IT_GRADER?.trim() || "unpinned";
+
 // Which assessment kind fits a phase, when the caller doesn't name one.
 const PHASE_KIND: Record<Phase, EvidenceKind> = {
 	diagnose: "explain",
@@ -321,7 +327,7 @@ function grade(cardId?: string, quality?: string) {
 	const q = Number(quality);
 	if (!cardId || Number.isNaN(q) || q < 0 || q > 5)
 		return console.log("Usage: grade <cardId> <quality 0-5>");
-	const card = gradeCard(db, Number(cardId), q);
+	const card = gradeCard(db, Number(cardId), q, grader());
 	console.log(
 		`Card ${card.id} -> next review ${card.next_review} (interval ${card.interval}d)`,
 	);
@@ -406,8 +412,16 @@ function evaluate(
 	const kind = kindArg as EvidenceKind;
 	const passed = score >= PASS ? 1 : 0;
 	db.run(
-		"INSERT INTO evidence (subject_id, concept_id, kind, bloom, score, passed, source_file) VALUES (?, NULL, ?, ?, ?, ?, ?)",
-		[subject.id, kind, EVIDENCE_BLOOM[kind], score, passed, file ?? null],
+		"INSERT INTO evidence (subject_id, concept_id, kind, bloom, score, passed, source_file, grader) VALUES (?, NULL, ?, ?, ?, ?, ?, ?)",
+		[
+			subject.id,
+			kind,
+			EVIDENCE_BLOOM[kind],
+			score,
+			passed,
+			file ?? null,
+			grader(),
+		],
 	);
 
 	stampMasteredIfExpert(subject);
@@ -449,8 +463,16 @@ function probe(
 	const kind = kindArg as EvidenceKind;
 	const passed = score >= PASS ? 1 : 0;
 	db.run(
-		"INSERT INTO evidence (subject_id, concept_id, kind, bloom, score, passed) VALUES (?, ?, ?, ?, ?, ?)",
-		[subject.id, concept.id, kind, EVIDENCE_BLOOM[kind], score, passed],
+		"INSERT INTO evidence (subject_id, concept_id, kind, bloom, score, passed, grader) VALUES (?, ?, ?, ?, ?, ?, ?)",
+		[
+			subject.id,
+			concept.id,
+			kind,
+			EVIDENCE_BLOOM[kind],
+			score,
+			passed,
+			grader(),
+		],
 	);
 	console.log(
 		`probe recorded: ${subjectName} / ${conceptName} ${kind} ${score}/100 (${passed ? "proven" : "shaky"}). Tier: ${tierLabel(getSubject(subjectName) as SubjectRow)}`,
@@ -506,6 +528,19 @@ function mastery(name?: string) {
 	console.log(
 		`Evidence: apply ${s.bestApply}/100${s.applyPassed ? " ✓" : ""} | explain ${s.explainPassed ? "✓" : "—"} | build ${s.buildPassed ? "✓" : "—"}`,
 	);
+	// Provenance audit: scores whose grader wasn't recorded are the soft spot in
+	// "un-gameable" — surface them so they can be re-graded by a pinned model.
+	const unpinned = (
+		db
+			.query(
+				"SELECT COUNT(*) AS c FROM evidence WHERE subject_id = ? AND (grader IS NULL OR grader = 'unpinned')",
+			)
+			.get(subject.id) as { c: number }
+	).c;
+	if (unpinned > 0)
+		console.log(
+			`⚠ ${unpinned} evidence score(s) have no recorded grader — set LEARN_IT_GRADER so mastery stays auditable.`,
+		);
 	if (m.blocking.length) {
 		console.log("To level up:");
 		for (const b of m.blocking) console.log(`  - ${b}`);

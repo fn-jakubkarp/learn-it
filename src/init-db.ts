@@ -60,7 +60,8 @@ db.run(
 
 // Append-only recall log. Mastery reads THIS, not self-report, so it can't be
 // faked by editing a file. interval_before is the gap the card survived —
-// the proof of real long-term retention.
+// the proof of real long-term retention. `grader` names the model that judged
+// the recall (card grading is meaning-tolerant, so it is a grader call too).
 db.run(
 	`CREATE TABLE IF NOT EXISTS reviews (
      id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -70,6 +71,7 @@ db.run(
      quality INTEGER NOT NULL,
      interval_before INTEGER NOT NULL,
      interval_after INTEGER NOT NULL,
+     grader TEXT DEFAULT 'unpinned',
      graded_at TEXT DEFAULT CURRENT_DATE,
      FOREIGN KEY (card_id) REFERENCES flashcards(id),
      FOREIGN KEY (subject_id) REFERENCES subjects(id)
@@ -81,7 +83,10 @@ db.run(
 // graded against a fixed rubric template. concept_id is set when a diagnostic
 // probe (explore-gaps) demonstrates a specific concept, NULL for subject-level
 // work like a build. `at` timestamps let the expert gate require evidence
-// spread over real time, not a single lucky session.
+// spread over real time, not a single lucky session. `grader` names WHICH model
+// produced the score: the whole value prop is un-gameable mastery, but the score
+// comes from an LLM grader (a soft, sycophantic sensor) — so every score must
+// record its grader to stay reproducible and auditable.
 db.run(
 	`CREATE TABLE IF NOT EXISTS evidence (
      id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -92,6 +97,7 @@ db.run(
      score INTEGER NOT NULL,
      passed INTEGER NOT NULL,
      source_file TEXT,
+     grader TEXT DEFAULT 'unpinned',
      at TEXT DEFAULT CURRENT_DATE,
      FOREIGN KEY (subject_id) REFERENCES subjects(id),
      FOREIGN KEY (concept_id) REFERENCES concepts(id)
@@ -110,6 +116,13 @@ function ensureColumn(table: string, col: string, decl: string) {
 }
 ensureColumn("flashcards", "stability", "REAL DEFAULT 0");
 ensureColumn("flashcards", "difficulty", "REAL DEFAULT 0");
+
+// Grader provenance, added later than the original tables. Backfill existing
+// rows as 'unpinned' (not NULL) so a score with no recorded grader is VISIBLE
+// when auditing — a soft grader is the value prop's weak point, so the gap must
+// not hide.
+ensureColumn("evidence", "grader", "TEXT DEFAULT 'unpinned'");
+ensureColumn("reviews", "grader", "TEXT DEFAULT 'unpinned'");
 
 db.close();
 console.log(`learn-it database ready at ${DB_PATH}`);

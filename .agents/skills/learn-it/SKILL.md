@@ -34,6 +34,16 @@ bun src/learn-it.ts advise {stage} "{subject}"   # "OK (phase: ...)" or "NOTE: <
 
 It **never refuses**. On a `NOTE`, surface it ("you have 0 reviews — an exam now tests little"), then **honor the learner's choice**. There is no `advance` — phase follows reality.
 
+## Pin the grader (provenance)
+
+Every score comes from **you**, an LLM grader — the soft spot in "un-gameable" mastery. So **prefix every grading command with the model you are running as**, so each score records its own provenance and a weak/old grader can be spotted and re-graded:
+
+```bash
+LEARN_IT_GRADER="<your-model-id>" bun src/learn-it.ts evaluate ...   # e.g. claude-opus-4-8
+```
+
+Applies to **`grade`, `evaluate`, and `probe`**. Set it inline on each call — a one-off `export` does not survive across commands. An unset grader logs `unpinned`, and `mastery` flags how many scores lack provenance; re-grade those with a pinned model when you can.
+
 ## Diagnose before you teach (placement, not self-report)
 
 A learner can't list what they don't know, and an experienced learner shouldn't start at novice. So after `init`, **don't trust the audit** — explore:
@@ -42,7 +52,7 @@ A learner can't list what they don't know, and an experienced learner shouldn't 
 2. **explore-gaps** — *test* the learner across that map at rising difficulty and record concept-level evidence with `probe`. A passing probe marks a concept proven and lifts the learner to their real level — up to **proficient** (expert still needs a build + durability over time).
 
 ```bash
-bun src/learn-it.ts probe "{subject}" "{concept}" <explain|apply> {0-100}
+LEARN_IT_GRADER="<your-model-id>" bun src/learn-it.ts probe "{subject}" "{concept}" <explain|apply> {0-100}
 bun src/learn-it.ts target "{subject}" <competent|proficient|expert>   # what they're aiming for
 ```
 
@@ -63,7 +73,7 @@ bun src/learn-it.ts assess "{subject}" [explain|apply|build]
 After the learner submits, grade it **against the rubric template** and record it:
 
 ```bash
-bun src/learn-it.ts evaluate "{subject}" <explain|apply|build> <score 0-100> [file]
+LEARN_IT_GRADER="<your-model-id>" bun src/learn-it.ts evaluate "{subject}" <explain|apply|build> <score 0-100> [file]
 ```
 
 Score each rubric dimension (see `templates/rubric/{kind}.md`) — do not invent your own scale. `>= 70` passes. This logs evidence that feeds mastery; a passing **build** is required to reach expert.
@@ -116,7 +126,7 @@ bun src/learn-it.ts mastery "{subject}"     # tier, % to next tier, exactly what
 - **Action**: Read `stages/review.md`. The `due` queue is **interleaved across both subjects and concepts** (consecutive cards come from different concepts where possible — that contextual interference is deliberate). One at a time, grade the typed answer 0-5:
   ```bash
   bun src/learn-it.ts due ["{subject}"]
-  bun src/learn-it.ts grade {cardId} {0-5}
+  LEARN_IT_GRADER="<your-model-id>" bun src/learn-it.ts grade {cardId} {0-5}
   ```
 - **Rule**: the learner must type a full answer. No "I know this" shortcuts.
 - **On a miss (grade < 3): teach, don't just reschedule.** Before the next card, give short *elaborative* feedback — why the answer was wrong, the correct mental model, and a cue that discriminates this card from the one it was confused with. A bare "wrong, next" wastes the most valuable moment in the loop (corrective feedback is one of the highest-leverage interventions there is). Keep it tight; then move on.
@@ -124,11 +134,11 @@ bun src/learn-it.ts mastery "{subject}"     # tier, % to next tier, exactly what
 ### /learn-it feynman {subject}
 - **Action**: Read `stages/feynman.md`. Reverse roles: the learner teaches, you play the novice and probe gaps. Record it as explain evidence:
   ```bash
-  bun src/learn-it.ts evaluate "{subject}" explain {0-100}
+  LEARN_IT_GRADER="<your-model-id>" bun src/learn-it.ts evaluate "{subject}" explain {0-100}
   ```
 
 ### /learn-it exam {subject}
 - **Action**: Read `stages/exam.md`. Run a hard, scored test on a NEW problem. Record it as apply evidence, then report mastery:
   ```bash
-  bun src/learn-it.ts evaluate "{subject}" apply {0-100}    # >= 90 needed toward expert
+  LEARN_IT_GRADER="<your-model-id>" bun src/learn-it.ts evaluate "{subject}" apply {0-100}    # >= 90 needed toward expert
   ```
