@@ -75,7 +75,7 @@ The **roadmap is the concept list**, and mastery rolls up from it. So *"types of
 The phases mirror how memory is built — but they're a **map a watcher reads, not rails you ride**. You learn how you want; Learn-it gives you the tools and a mentor watching over you.
 
 ```
-diagnose → conceptualize → anchor → recall → space → verify → mastered
+diagnose → conceptualize → recall → space → verify → mastered
 ```
 
 - **Run any stage on demand.** Nothing is blocked. If you jump ahead, the watcher *nudges* ("you've reviewed 0 cards — an exam now tests little") and lets you decide.
@@ -85,8 +85,7 @@ diagnose → conceptualize → anchor → recall → space → verify → master
 | Phase | Suggested stage | What happens |
 |-------|-----------------|--------------|
 | `diagnose` | `init`, `plan` | Audit your gaps; turn the audit into a roadmap of concepts. |
-| `conceptualize` | `concept` | Build the big picture by analogy and mechanism. |
-| `anchor` | `anchor`, `extract` | Glue raw facts with mnemonics; extract them into cards. |
+| `conceptualize` | `concept`, `extract` | Build the big picture by analogy and mechanism, then extract it into cards. (`anchor` is an optional tool for gluing raw facts — syntax, names — with mnemonics.) |
 | `recall` / `space` | `review` | The scheduler quizzes you on due cards and reschedules. |
 | `verify` | `feynman`, `exam` | Teach it back; pass hard assessments to reach `mastered`. |
 

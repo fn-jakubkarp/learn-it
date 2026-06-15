@@ -48,7 +48,6 @@ const auditTemplate = (name: string) =>
 const PHASE_KIND: Record<Phase, EvidenceKind> = {
 	diagnose: "explain",
 	conceptualize: "explain",
-	anchor: "apply",
 	recall: "apply",
 	space: "apply",
 	verify: "apply",

@@ -12,7 +12,7 @@ Learn-it gives the learner **proper tools and a watcher**, not a railroad.
 
 **Structure (2-tier):** a **subject** is the thing you master ("Rust", "Networking") — it carries the roadmap, the phase, and the Dreyfus mastery tier. A **concept** is a lesson-sized leaf under it ("ownership", "IP address types") — cards attach to concepts; a concept is retained-or-not, it has no tier of its own. The roadmap IS the concept list.
 
-The phases (`diagnose -> conceptualize -> anchor -> recall -> space -> verify -> mastered`) are a **map**, not a locked sequence. The learner can:
+The phases (`diagnose -> conceptualize -> recall -> space -> verify -> mastered`) are a **map**, not a locked sequence (`anchor` is an optional tool, not a phase — mnemonics for raw facts only). The learner can:
 
 - run **several subjects at once**, each at its own phase;
 - run **any stage on demand** — nothing is blocked;

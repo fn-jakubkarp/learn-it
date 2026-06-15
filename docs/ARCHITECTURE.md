@@ -26,7 +26,7 @@ State (phase, tier) is **never stored** — it's computed from Knowledge (`subje
 ## The learning map (not a railroad)
 
 ```
-diagnose → conceptualize → anchor → recall → space → verify → mastered
+diagnose → conceptualize → recall → space → verify → mastered
 ```
 
 - **Any stage on demand.** Nothing is blocked; the watcher nudges when you jump ahead.

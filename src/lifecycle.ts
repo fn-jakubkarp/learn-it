@@ -9,12 +9,17 @@
 export const PHASES = [
 	"diagnose", // audit current knowledge, gaps
 	"conceptualize", // build the big picture
-	"anchor", // glue raw facts with mnemonics
-	"recall", // active retrieval
+	"recall", // active retrieval — start early, don't wait for "perfect" understanding
 	"space", // spaced repetition over time
 	"verify", // Feynman + exam under pressure
 	"mastered", // passed
 ] as const;
+
+// NOTE: `anchor` (mnemonics — palace / acronym / story) is deliberately NOT a
+// phase. Mnemonics are low-utility for conceptual material and only earn their
+// keep on raw, un-deducible facts (syntax, names). So anchor is an OPTIONAL
+// tool reachable any time, not a station every subject must pass through — and
+// retrieval (recall) is encouraged early rather than gated behind it.
 
 export type Phase = (typeof PHASES)[number];
 
@@ -33,8 +38,8 @@ export interface TopicSignals {
 // The stage(s) to suggest when a topic sits at a given phase.
 export const PHASE_SUGGESTION: Record<Phase, string> = {
 	diagnose: "explore-topic / explore-gaps, then plan",
-	conceptualize: "concept / anchor / extract",
-	anchor: "anchor / extract",
+	conceptualize:
+		"concept, then extract -> review (anchor optional, raw facts only)",
 	recall: "review",
 	space: "review",
 	verify: "feynman, then exam",
@@ -48,8 +53,8 @@ const STAGE_PHASE: Record<string, Phase> = {
 	"explore-gaps": "diagnose",
 	plan: "diagnose",
 	concept: "conceptualize",
-	anchor: "anchor",
-	extract: "anchor",
+	anchor: "conceptualize", // optional helper, available while building understanding
+	extract: "conceptualize", // bridges conceptualize -> recall; fine to run early
 	review: "recall",
 	feynman: "verify",
 	exam: "verify",
