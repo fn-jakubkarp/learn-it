@@ -31,6 +31,8 @@ export interface CardRow extends CardState {
 	question: string;
 	answer: string;
 	next_review: string;
+	last_reviewed: string | null; // date of the most recent grade; NULL if unseen
+	suspended: number; // 1 = out of the due queue (leech / paused), 0 = active
 }
 
 // FSRS v4 default weights w[0..16].
@@ -61,6 +63,14 @@ export function addDays(isoDate: string, days: number): string {
 	const d = new Date(`${isoDate}T00:00:00Z`);
 	d.setUTCDate(d.getUTCDate() + days);
 	return d.toISOString().slice(0, 10);
+}
+
+// Whole days from one ISO date to another (UTC). Used to derive the real gap a
+// card survived (today − last_reviewed) for the forgetting curve.
+export function daysBetween(fromIso: string, toIso: string): number {
+	const a = Date.parse(`${fromIso}T00:00:00Z`);
+	const b = Date.parse(`${toIso}T00:00:00Z`);
+	return Math.round((b - a) / 86_400_000);
 }
 
 // CLI grades are 0-5 (SM-2 heritage, kept so the review UX is unchanged). FSRS
@@ -113,18 +123,28 @@ function forgetStability(d: number, s: number, r: number): number {
 	return Math.min(sf, s);
 }
 
-// quality: 0..5 (CLI scale). <3 = failed recall. Pure: returns the next state.
-export function schedule(card: CardState, quality: number): CardState {
+// quality: 0..5 (CLI scale). <3 = failed recall. elapsedDays is the ACTUAL number
+// of days since the card was last reviewed (today − last_reviewed) — what the
+// forgetting curve needs, NOT the scheduled interval. Pure: returns the next state.
+//
+// Real elapsed time is also what makes "proven by retention" un-gameable: grading
+// a card twice the same day gives elapsedDays = 0, so retrievability = 1.0, so the
+// stability increment collapses to ~0 (recall) — the interval cannot be made to
+// climb by repeated same-day grading without real time passing.
+export function schedule(
+	card: CardState,
+	quality: number,
+	elapsedDays: number,
+): CardState {
 	const g = ratingFromQuality(quality);
 	let { stability, difficulty } = card;
 
 	if (card.repetitions === 0 || !stability) {
-		// First review: seed S and D from the grade alone.
+		// First review: seed S and D from the grade alone (no elapsed time yet).
 		stability = initStability(g);
 		difficulty = initDifficulty(g);
 	} else {
-		// interval is the gap this card just survived — its retrievability now.
-		const r = retrievability(card.interval, stability);
+		const r = retrievability(Math.max(0, elapsedDays), stability);
 		difficulty = nextDifficulty(difficulty, g);
 		stability =
 			g === 1
@@ -174,12 +194,14 @@ export function getDueCards(db: Database, subjectName?: string): CardRow[] {
 		? (db
 				.query(
 					`SELECT f.* FROM flashcards f JOIN subjects s ON f.subject_id = s.id
-         WHERE s.name = ? AND f.next_review <= ? ORDER BY f.next_review ASC`,
+         WHERE s.name = ? AND f.next_review <= ? AND COALESCE(f.suspended, 0) = 0
+         ORDER BY f.next_review ASC`,
 				)
 				.all(subjectName, now) as CardRow[])
 		: (db
 				.query(
-					`SELECT * FROM flashcards WHERE next_review <= ? ORDER BY next_review ASC`,
+					`SELECT * FROM flashcards WHERE next_review <= ? AND COALESCE(suspended, 0) = 0
+         ORDER BY next_review ASC`,
 				)
 				.all(now) as CardRow[]);
 	return interleaveByConcept(rows);
@@ -196,6 +218,11 @@ export function gradeCard(
 		| undefined;
 	if (!card) throw new Error(`No card with id ${cardId}`);
 
+	const now = today();
+	// Real elapsed days since the last grade — the gap the card actually survived.
+	// A first-ever review (no last_reviewed) seeds from the grade, so elapsed = 0.
+	const elapsed = card.last_reviewed ? daysBetween(card.last_reviewed, now) : 0;
+
 	const next = schedule(
 		{
 			interval: card.interval,
@@ -204,36 +231,90 @@ export function gradeCard(
 			repetitions: card.repetitions,
 		},
 		quality,
+		elapsed,
 	);
-	const nextReview = addDays(today(), next.interval);
+	const nextReview = addDays(now, next.interval);
 
 	db.run(
-		"UPDATE flashcards SET interval = ?, stability = ?, difficulty = ?, repetitions = ?, next_review = ? WHERE id = ?",
+		"UPDATE flashcards SET interval = ?, stability = ?, difficulty = ?, repetitions = ?, next_review = ?, last_reviewed = ? WHERE id = ?",
 		[
 			next.interval,
 			next.stability,
 			next.difficulty,
 			next.repetitions,
 			nextReview,
+			now,
 			cardId,
 		],
 	);
 
-	// Log the recall. interval_before is the gap this card just survived — the
-	// proof that mastery scoring relies on (see src/mastery.ts). grader names the
-	// model that judged it, so the recall is auditable.
+	// Log the recall. interval_before is the REAL gap this card survived (actual
+	// elapsed days), the proof mastery scoring relies on (see src/mastery.ts).
+	// graded_at is pinned to the engine's `now` (UTC) so a replay can reconstruct
+	// timing. grader names the model that judged it, so the recall is auditable.
 	db.run(
-		"INSERT INTO reviews (card_id, concept_id, subject_id, quality, interval_before, interval_after, grader) VALUES (?, ?, ?, ?, ?, ?, ?)",
+		"INSERT INTO reviews (card_id, concept_id, subject_id, quality, interval_before, interval_after, grader, graded_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
 		[
 			cardId,
 			card.concept_id,
 			card.subject_id,
 			quality,
-			card.interval,
+			elapsed,
 			next.interval,
 			grader,
+			now,
 		],
 	);
 
-	return { ...card, ...next, next_review: nextReview };
+	return { ...card, ...next, next_review: nextReview, last_reviewed: now };
+}
+
+// Rebuild a card's FSRS state by replaying its reviews in order. Used by `ungrade`
+// after the most recent review row is deleted: each review stored interval_before
+// = the real elapsed days at that grade, so the replay reproduces the exact prior
+// state with no separate snapshot. Resets to a fresh, unseen card if none remain.
+export function replayCard(db: Database, cardId: number): void {
+	const exists = db.query("SELECT id FROM flashcards WHERE id = ?").get(cardId);
+	if (!exists) throw new Error(`No card with id ${cardId}`);
+
+	const reviews = db
+		.query(
+			"SELECT quality, interval_before, graded_at FROM reviews WHERE card_id = ? ORDER BY id ASC",
+		)
+		.all(cardId) as {
+		quality: number;
+		interval_before: number;
+		graded_at: string;
+	}[];
+
+	if (!reviews.length) {
+		db.run(
+			"UPDATE flashcards SET interval = 0, stability = 0, difficulty = 0, repetitions = 0, next_review = ?, last_reviewed = NULL WHERE id = ?",
+			[today(), cardId],
+		);
+		return;
+	}
+
+	let state: CardState = {
+		interval: 0,
+		stability: 0,
+		difficulty: 0,
+		repetitions: 0,
+	};
+	for (const r of reviews)
+		state = schedule(state, r.quality, r.interval_before);
+
+	const lastReviewed = reviews[reviews.length - 1]?.graded_at ?? today();
+	db.run(
+		"UPDATE flashcards SET interval = ?, stability = ?, difficulty = ?, repetitions = ?, next_review = ?, last_reviewed = ? WHERE id = ?",
+		[
+			state.interval,
+			state.stability,
+			state.difficulty,
+			state.repetitions,
+			addDays(lastReviewed, state.interval),
+			lastReviewed,
+			cardId,
+		],
+	);
 }
