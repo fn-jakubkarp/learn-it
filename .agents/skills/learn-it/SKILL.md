@@ -113,12 +113,13 @@ bun src/learn-it.ts mastery "{subject}"     # tier, % to next tier, exactly what
   ```
 
 ### /learn-it review [subject]
-- **Action**: Read `stages/review.md`. With no subject the queue interleaves every subject's due cards. One at a time, grade the typed answer 0-5:
+- **Action**: Read `stages/review.md`. The `due` queue is **interleaved across both subjects and concepts** (consecutive cards come from different concepts where possible — that contextual interference is deliberate). One at a time, grade the typed answer 0-5:
   ```bash
   bun src/learn-it.ts due ["{subject}"]
   bun src/learn-it.ts grade {cardId} {0-5}
   ```
 - **Rule**: the learner must type a full answer. No "I know this" shortcuts.
+- **On a miss (grade < 3): teach, don't just reschedule.** Before the next card, give short *elaborative* feedback — why the answer was wrong, the correct mental model, and a cue that discriminates this card from the one it was confused with. A bare "wrong, next" wastes the most valuable moment in the loop (corrective feedback is one of the highest-leverage interventions there is). Keep it tight; then move on.
 
 ### /learn-it feynman {subject}
 - **Action**: Read `stages/feynman.md`. Reverse roles: the learner teaches, you play the novice and probe gaps. Record it as explain evidence:

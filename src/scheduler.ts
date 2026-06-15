@@ -140,21 +140,49 @@ export function schedule(card: CardState, quality: number): CardState {
 	};
 }
 
+// Round-robin the due cards across their concepts so consecutive cards are,
+// wherever possible, from DIFFERENT concepts. Interleaving (vs. blocking one
+// concept at a time) is a distinct "desirable difficulty" beyond spacing — the
+// contextual interference forces discrimination between concepts and improves
+// transfer (Rohrer & Taylor). Due-order is preserved within each concept, so
+// the most-overdue card of a concept still comes first.
+function interleaveByConcept(rows: CardRow[]): CardRow[] {
+	const queues = new Map<number, CardRow[]>();
+	for (const r of rows) {
+		const q = queues.get(r.concept_id);
+		if (q) q.push(r);
+		else queues.set(r.concept_id, [r]);
+	}
+	const out: CardRow[] = [];
+	let pulled = true;
+	while (pulled) {
+		pulled = false;
+		for (const q of queues.values()) {
+			const card = q.shift();
+			if (card) {
+				out.push(card);
+				pulled = true;
+			}
+		}
+	}
+	return out;
+}
+
 export function getDueCards(db: Database, subjectName?: string): CardRow[] {
 	const now = today();
-	if (subjectName) {
-		return db
-			.query(
-				`SELECT f.* FROM flashcards f JOIN subjects s ON f.subject_id = s.id
+	const rows = subjectName
+		? (db
+				.query(
+					`SELECT f.* FROM flashcards f JOIN subjects s ON f.subject_id = s.id
          WHERE s.name = ? AND f.next_review <= ? ORDER BY f.next_review ASC`,
-			)
-			.all(subjectName, now) as CardRow[];
-	}
-	return db
-		.query(
-			`SELECT * FROM flashcards WHERE next_review <= ? ORDER BY next_review ASC`,
-		)
-		.all(now) as CardRow[];
+				)
+				.all(subjectName, now) as CardRow[])
+		: (db
+				.query(
+					`SELECT * FROM flashcards WHERE next_review <= ? ORDER BY next_review ASC`,
+				)
+				.all(now) as CardRow[]);
+	return interleaveByConcept(rows);
 }
 
 export function gradeCard(db: Database, cardId: number, quality: number) {
