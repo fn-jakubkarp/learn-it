@@ -27,10 +27,19 @@ export const DREYFUS = [
 
 export type Tier = (typeof DREYFUS)[number];
 
-// Bloom level per evidence kind — the depth a piece of evidence demonstrates.
-export const EVIDENCE_BLOOM = { explain: 2, apply: 4, build: 6 } as const;
+// Bloom level (revised taxonomy) per evidence kind — the cognitive depth a
+// piece of evidence demonstrates: Understand = 2 (explain), Apply = 3 (apply),
+// Create = 6 (build).
+export const EVIDENCE_BLOOM = { explain: 2, apply: 3, build: 6 } as const;
 export type EvidenceKind = keyof typeof EVIDENCE_BLOOM;
 
+// Retention ladder — three rungs measuring how long a card has survived between
+// recalls. Centralised here so the rungs stay ordered and coordinated; the
+// "mature" rung used to live as a bare `7` inside a query in learn-it.ts.
+//   MATURE    ( 7d) — card has settled out of daily churn (lifecycle "space")
+//   RETENTION (21d) — gap a successful recall must clear to PROVE a concept
+//   LONG      (60d) — durable long-term retention; a rung toward expert
+export const MATURE_INTERVAL_DAYS = 7;
 export const RETENTION_DAYS = 21;
 export const LONG_RETENTION_DAYS = 60;
 export const PASS = 70; // evidence at/above this passes; 90+ needed for expert

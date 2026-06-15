@@ -14,6 +14,7 @@ import {
 	EVIDENCE_BLOOM,
 	type EvidenceKind,
 	LONG_RETENTION_DAYS,
+	MATURE_INTERVAL_DAYS,
 	type MasterySignals,
 	PASS,
 	RETENTION_DAYS,
@@ -103,7 +104,7 @@ function readSignals(subject: SubjectRow): TopicSignals {
 		.query(
 			`SELECT COUNT(*) AS c,
               SUM(CASE WHEN repetitions >= 1 THEN 1 ELSE 0 END) AS r,
-              SUM(CASE WHEN interval >= 7 THEN 1 ELSE 0 END) AS m
+              SUM(CASE WHEN interval >= ${MATURE_INTERVAL_DAYS} THEN 1 ELSE 0 END) AS m
        FROM flashcards WHERE subject_id = ?`,
 		)
 		.get(subject.id) as { c: number; r: number | null; m: number | null };
