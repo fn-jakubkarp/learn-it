@@ -36,8 +36,11 @@ db.run(
    );`,
 );
 
-// Spaced-repetition state per card (SM-2). A card belongs to a concept;
-// subject_id is denormalized so mastery roll-up needs no triple join.
+// Spaced-repetition state per card (FSRS v4). A card belongs to a concept;
+// subject_id is denormalized so mastery roll-up needs no triple join. stability
+// and difficulty are FSRS's latent memory variables; interval is derived from
+// them each review (see src/scheduler.ts). Both default 0 = an unseen card,
+// seeded from its first grade.
 db.run(
 	`CREATE TABLE IF NOT EXISTS flashcards (
      id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -47,7 +50,8 @@ db.run(
      answer TEXT NOT NULL,
      next_review TEXT DEFAULT CURRENT_DATE,
      interval INTEGER DEFAULT 0,
-     ease_factor REAL DEFAULT 2.5,
+     stability REAL DEFAULT 0,
+     difficulty REAL DEFAULT 0,
      repetitions INTEGER DEFAULT 0,
      FOREIGN KEY (concept_id) REFERENCES concepts(id),
      FOREIGN KEY (subject_id) REFERENCES subjects(id)
@@ -93,6 +97,19 @@ db.run(
      FOREIGN KEY (concept_id) REFERENCES concepts(id)
    );`,
 );
+
+// Forward-migrate a pre-FSRS database: add the FSRS columns if an older
+// flashcards table (SM-2, with ease_factor) is already on disk. CREATE TABLE
+// IF NOT EXISTS leaves an existing table untouched, so do it explicitly.
+function ensureColumn(table: string, col: string, decl: string) {
+	const cols = db.query(`PRAGMA table_info(${table})`).all() as {
+		name: string;
+	}[];
+	if (!cols.some((c) => c.name === col))
+		db.run(`ALTER TABLE ${table} ADD COLUMN ${col} ${decl}`);
+}
+ensureColumn("flashcards", "stability", "REAL DEFAULT 0");
+ensureColumn("flashcards", "difficulty", "REAL DEFAULT 0");
 
 db.close();
 console.log(`learn-it database ready at ${DB_PATH}`);

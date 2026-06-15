@@ -1,6 +1,6 @@
 # CLAUDE.md — learn-it
 
-AI learning pipeline (Bun + TypeScript + `bun:sqlite`, linted by Biome 2.5). Helps a learner upskill using cognitive-science methods: spaced repetition (SM-2), active recall, Feynman, Bloom depth, the Dreyfus skill ladder.
+AI learning pipeline (Bun + TypeScript + `bun:sqlite`, linted by Biome 2.5). Helps a learner upskill using cognitive-science methods: spaced repetition (FSRS), active recall, Feynman, Bloom depth, the Dreyfus skill ladder.
 
 See `docs/ARCHITECTURE.md` for the design. (Design rationale / decision history is kept in private local notes, not in this public repo.)
 

@@ -1,6 +1,6 @@
 # Architecture
 
-learn-it is an AI learning pipeline built on cognitive science: spaced repetition (SM-2), active recall, the Feynman technique, Bloom's depth levels, and the Dreyfus skill-acquisition ladder. The agent is a **mentor with tools**, not a course on rails.
+learn-it is an AI learning pipeline built on cognitive science: spaced repetition (FSRS), active recall, the Feynman technique, Bloom's depth levels, and the Dreyfus skill-acquisition ladder. The agent is a **mentor with tools**, not a course on rails.
 
 ## 2-tier structure: subjects → concepts
 
@@ -16,7 +16,7 @@ The **roadmap is the concept list**. Coverage and mastery roll up from concepts,
 | File | Role |
 |------|------|
 | `init-db.ts` | SQLite schema: `subjects`, `concepts`, `flashcards`, append-only `reviews`, `evidence`. |
-| `scheduler.ts` | SM-2 spaced repetition; every grade logs a `reviews` row with the interval the card survived. |
+| `scheduler.ts` | FSRS spaced repetition; every grade logs a `reviews` row with the interval the card survived. |
 | `mastery.ts` | Dreyfus tiers computed from logged performance (no volume credit). |
 | `lifecycle.ts` | Phase **map** (diagnose→…→mastered); infers phase from real state, advises but never blocks. |
 | `learn-it.ts` | CLI router: dashboard, concepts, cards, probe, assess/evaluate, mastery, target. |

@@ -1,6 +1,6 @@
 ---
 name: learn-it
-description: Cognitive learning engine -- subjects broken into concepts, a watcher that tracks many subjects at once, an SM-2 scheduler, and harsh per-subject mastery scored from logged performance. Tools, not rails.
+description: Cognitive learning engine -- subjects broken into concepts, a watcher that tracks many subjects at once, an FSRS scheduler, and harsh per-subject mastery scored from logged performance. Tools, not rails.
 arguments: stage
 user_invocable: true
 argument-hint: "[ (no args = resume) | init | explore-topic | explore-gaps | plan | concept | anchor | extract | review | feynman | exam | assess | evaluate | mastery ]"

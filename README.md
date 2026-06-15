@@ -34,7 +34,7 @@ Learn-it is built around a 6-step framework based on how the human brain natural
 
 ### 5. Spaced Repetition
 * **Consolidate knowledge:** Memory is formed through the process of forgetting and remembering. 
-* **Optimized intervals:** Learn-it schedules your reviews based on the Ebbinghaus forgetting curve (e.g., 1 day, 3 days, 7 days, 14 days, 30 days) to lock knowledge into long-term memory.
+* **Optimized intervals:** Learn-it schedules with **FSRS** — the algorithm Anki now ships by default. Rather than fixed steps, it models each card's memory *stability* and *difficulty* and sets the next review for the day your recall probability is predicted to fall to a target (~90%) — so each review lands right as you're about to forget.
 
 ### 6. Brutal Verification & Transfer
 * **Real-world scenarios:** Try to explain the topic simply, applying it to real-life examples (The Feynman Technique). 
@@ -134,7 +134,7 @@ assess (issue from template) → you submit → evaluate (score vs rubric) → e
 |------|------|
 | `src/learn-it.ts` | Session router — dashboard, watcher, concepts, cards, assess/evaluate, mastery. |
 | `src/lifecycle.ts` | The phase map: infers a subject's phase and advises (never blocks). |
-| `src/scheduler.ts` | SM-2 spaced-repetition core; logs every recall to `reviews`. |
+| `src/scheduler.ts` | FSRS spaced-repetition core; logs every recall to `reviews`. |
 | `src/mastery.ts` | Dreyfus tiers, rolled up over concepts + evidence (no volume credit). |
 | `src/init-db.ts` | Creates the SQLite schema. |
 | `data/learn_it.db` | `subjects`, `concepts`, `flashcards`, the append-only `reviews` log, and `evidence`. |

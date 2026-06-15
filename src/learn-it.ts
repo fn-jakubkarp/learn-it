@@ -346,8 +346,9 @@ function assess(subjectName?: string, kindArg?: string) {
 		return console.log(`Missing template: ${tmplPath}`);
 
 	const m = assessMastery(masterySignals(subject));
+	// Weakest first: highest FSRS difficulty (the cards fighting back hardest).
 	const due = [...getDueCards(db, subjectName)].sort(
-		(a, b) => a.ease_factor - b.ease_factor,
+		(a, b) => b.difficulty - a.difficulty,
 	);
 	const weakest = due.slice(0, 5).map((c) => c.question);
 	const focus = [
