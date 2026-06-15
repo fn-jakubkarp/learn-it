@@ -35,13 +35,49 @@ db.run(
 // CONCEPT = a lesson-sized leaf under a subject ("ownership", "IP address
 // types"). The roadmap IS the concept list; coverage is measured against it.
 // A concept has no tier of its own — it is retained-or-not.
+//
+// A concept carries its OWN spaced-exposure clock (stability/difficulty/interval/
+// next_exposure, FSRS — see src/exposure.ts), advanced by ANY reinforcement
+// surface (re-explain, quick quiz, re-read, flashcard), not just cards. This is
+// what makes the conversational/varied-exposure stream first-class: spacing is a
+// property of the concept, and flashcards are merely one surface that advances it.
+// `status` is the diagnostic placement (blank | shaky | known) from explore-gaps.
 db.run(
 	`CREATE TABLE IF NOT EXISTS concepts (
      id INTEGER PRIMARY KEY AUTOINCREMENT,
      subject_id INTEGER NOT NULL,
      name TEXT NOT NULL,
+     status TEXT,
+     stability REAL DEFAULT 0,
+     difficulty REAL DEFAULT 0,
+     interval INTEGER DEFAULT 0,
+     reps INTEGER DEFAULT 0,
+     last_exposed TEXT,
+     next_exposure TEXT,
      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
      UNIQUE (subject_id, name),
+     FOREIGN KEY (subject_id) REFERENCES subjects(id)
+   );`,
+);
+
+// Append-only, medium-agnostic reinforcement log at the CONCEPT level — the
+// conceptual analog of `reviews`. Every exposure (surface = explain | quiz |
+// read | card) records how the concept was hit and the real gap it survived, so
+// "what to reinforce next" and concept-level retention are computed from all
+// surfaces, not flashcards alone. read is recognition (capped credit, never
+// proves a concept); explain/quiz/card are retrieval.
+db.run(
+	`CREATE TABLE IF NOT EXISTS exposures (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     concept_id INTEGER NOT NULL,
+     subject_id INTEGER NOT NULL,
+     surface TEXT NOT NULL,
+     quality INTEGER NOT NULL,
+     interval_before INTEGER NOT NULL,
+     interval_after INTEGER NOT NULL,
+     grader TEXT DEFAULT 'unpinned',
+     at TEXT DEFAULT CURRENT_DATE,
+     FOREIGN KEY (concept_id) REFERENCES concepts(id),
      FOREIGN KEY (subject_id) REFERENCES subjects(id)
    );`,
 );
@@ -151,6 +187,16 @@ ensureColumn("flashcards", "difficulty", "REAL DEFAULT 0");
 // out of the due queue without deleting its history (leeches, paused cards).
 ensureColumn("flashcards", "last_reviewed", "TEXT");
 ensureColumn("flashcards", "suspended", "INTEGER DEFAULT 0");
+
+// Concept-level spaced-exposure state, added with the exposure engine. Existing
+// concepts migrate to a zeroed clock (unseen) and NULL status.
+ensureColumn("concepts", "status", "TEXT");
+ensureColumn("concepts", "stability", "REAL DEFAULT 0");
+ensureColumn("concepts", "difficulty", "REAL DEFAULT 0");
+ensureColumn("concepts", "interval", "INTEGER DEFAULT 0");
+ensureColumn("concepts", "reps", "INTEGER DEFAULT 0");
+ensureColumn("concepts", "last_exposed", "TEXT");
+ensureColumn("concepts", "next_exposure", "TEXT");
 
 // Grader provenance, added later than the original tables. Backfill existing
 // rows as 'unpinned' (not NULL) so a score with no recorded grader is VISIBLE

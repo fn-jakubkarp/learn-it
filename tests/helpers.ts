@@ -22,7 +22,21 @@ export function makeDb(): {
 		`CREATE TABLE concepts (
        id INTEGER PRIMARY KEY AUTOINCREMENT,
        subject_id INTEGER NOT NULL, name TEXT NOT NULL,
+       status TEXT, stability REAL DEFAULT 0, difficulty REAL DEFAULT 0,
+       interval INTEGER DEFAULT 0, reps INTEGER DEFAULT 0,
+       last_exposed TEXT, next_exposure TEXT,
        UNIQUE (subject_id, name),
+       FOREIGN KEY (subject_id) REFERENCES subjects(id)
+     );`,
+	);
+	db.run(
+		`CREATE TABLE exposures (
+       id INTEGER PRIMARY KEY AUTOINCREMENT,
+       concept_id INTEGER NOT NULL, subject_id INTEGER NOT NULL,
+       surface TEXT NOT NULL, quality INTEGER NOT NULL,
+       interval_before INTEGER NOT NULL, interval_after INTEGER NOT NULL,
+       grader TEXT DEFAULT 'unpinned', at TEXT DEFAULT CURRENT_DATE,
+       FOREIGN KEY (concept_id) REFERENCES concepts(id),
        FOREIGN KEY (subject_id) REFERENCES subjects(id)
      );`,
 	);

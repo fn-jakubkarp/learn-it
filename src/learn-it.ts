@@ -2,6 +2,15 @@ import { Database } from "bun:sqlite";
 import fs from "node:fs";
 import path from "node:path";
 import {
+	type DueConcept,
+	dueConcepts,
+	isSurface,
+	recordExposure,
+	SURFACES,
+	type Surface,
+	statusFromScore,
+} from "./exposure";
+import {
 	advise,
 	inferPhase,
 	PHASE_SUGGESTION,
@@ -67,6 +76,11 @@ const auditTemplate = (name: string) =>
 // LEARN_IT_GRADER=claude-opus-4-8); when unset it logs 'unpinned' rather than
 // NULL, so a score with no provenance shows up in an audit instead of hiding.
 const grader = (): string => process.env.LEARN_IT_GRADER?.trim() || "unpinned";
+
+// Map a 0-100 assessment/probe score onto the 0-5 recall scale the exposure clock
+// uses, so a graded retrieval advances spacing like a card grade.
+const scoreToQuality = (s: number): number =>
+	s >= 85 ? 5 : s >= 70 ? 4 : s >= 40 ? 3 : 1;
 
 // Which assessment kind fits a phase, when the caller doesn't name one.
 const PHASE_KIND: Record<Phase, EvidenceKind> = {
@@ -181,13 +195,18 @@ function masterySignals(subject: SubjectRow): MasterySignals {
 				`SELECT COUNT(*) AS c FROM (
            SELECT concept_id FROM flashcards WHERE subject_id = ? AND repetitions >= 1
            UNION
+           SELECT concept_id FROM exposures WHERE subject_id = ?
+           UNION
            SELECT concept_id FROM evidence
              WHERE subject_id = ? AND concept_id IS NOT NULL AND passed = 1
          )`,
 			)
-			.get(sid, sid) as { c: number }
+			.get(sid, sid, sid) as { c: number }
 	).c;
 
+	// A concept is proven by retention across a real gap — through cards OR
+	// through retrieval exposures (re-explain / quiz), counted symmetrically — OR
+	// by passing concept-level evidence. `read` is recognition and is excluded.
 	const proven = (
 		db
 			.query(
@@ -195,19 +214,30 @@ function masterySignals(subject: SubjectRow): MasterySignals {
            SELECT concept_id FROM reviews
              WHERE subject_id = ? AND quality >= 3 AND interval_before >= ?
            UNION
+           SELECT concept_id FROM exposures
+             WHERE subject_id = ? AND surface IN ('explain','quiz','card')
+               AND quality >= 3 AND interval_before >= ?
+           UNION
            SELECT concept_id FROM evidence
              WHERE subject_id = ? AND concept_id IS NOT NULL AND passed = 1
          )`,
 			)
-			.get(sid, RETENTION_DAYS, sid) as { c: number }
+			.get(sid, RETENTION_DAYS, sid, RETENTION_DAYS, sid) as { c: number }
 	).c;
 
 	const longRet = (
 		db
 			.query(
-				"SELECT COUNT(DISTINCT concept_id) AS c FROM reviews WHERE subject_id = ? AND quality >= 3 AND interval_before >= ?",
+				`SELECT COUNT(*) AS c FROM (
+           SELECT concept_id FROM reviews
+             WHERE subject_id = ? AND quality >= 3 AND interval_before >= ?
+           UNION
+           SELECT concept_id FROM exposures
+             WHERE subject_id = ? AND surface IN ('explain','quiz','card')
+               AND quality >= 3 AND interval_before >= ?
+         )`,
 			)
-			.get(sid, LONG_RETENTION_DAYS) as { c: number }
+			.get(sid, LONG_RETENTION_DAYS, sid, LONG_RETENTION_DAYS) as { c: number }
 	).c;
 
 	const apply = db
@@ -365,6 +395,9 @@ function grade(cardId?: string, quality?: string) {
 			`NOTE: card ${id} isn't due until ${card.next_review}; an early review barely moves retention.`,
 		);
 	const updated = gradeCard(db, id, q, grader());
+	// A card review is one exposure surface — advance the concept's clock too, so
+	// reinforcing via cards and via talk feed the same concept-level schedule.
+	recordExposure(db, card.concept_id, "card", q, grader());
 	console.log(
 		`Card ${updated.id} -> next review ${updated.next_review} (interval ${updated.interval}d)`,
 	);
@@ -483,6 +516,82 @@ function suspendCard(cardId?: string, stateArg?: string) {
 	);
 }
 
+// ---- exposure (concept-level spaced reinforcement) --------------------------
+
+// Record a reinforcement touch on a concept through a surface. explain/quiz are
+// graded retrieval (quality 0-5); read is recognition (capped, quality optional);
+// card exposures are recorded automatically by `grade`.
+function expose(
+	subjectName?: string,
+	conceptName?: string,
+	surfaceArg?: string,
+	qualityArg?: string,
+) {
+	const surfaces = Object.keys(SURFACES).join("|");
+	if (!subjectName || !conceptName || !surfaceArg || !isSurface(surfaceArg))
+		return console.log(
+			`Usage: expose "<subject>" "<concept>" <${surfaces}> [quality 0-5]`,
+		);
+	const subject = getSubject(subjectName);
+	if (!subject) return console.log(`No subject: ${subjectName}`);
+	const concept = getConcept(subject.id, conceptName);
+	if (!concept)
+		return console.log(
+			`No concept "${conceptName}" in ${subjectName} — add it first: addconcept`,
+		);
+	const surface = surfaceArg as Surface;
+	let q = Number(qualityArg);
+	if (SURFACES[surface].strong && (Number.isNaN(q) || q < 0 || q > 5))
+		return console.log(
+			`${surface} is graded retrieval — Usage: expose "${subjectName}" "${conceptName}" ${surface} <quality 0-5>`,
+		);
+	if (!SURFACES[surface].strong && Number.isNaN(q)) q = 2; // read: recognition
+	const r = recordExposure(db, concept.id, surface, q, grader());
+	console.log(
+		`exposure recorded: ${subjectName} / ${conceptName} via ${surface}. Next exposure ${r.nextExposure} (in ${r.interval}d).`,
+	);
+}
+
+// The reinforcement queue: concepts due to be hit again through ANY surface. The
+// primary "what should I do now" view — cards are just one way to clear it.
+function listDueConcepts(subjectName?: string) {
+	if (subjectName && !getSubject(subjectName))
+		return console.log(`No subject: ${subjectName}`);
+	const due: DueConcept[] = dueConcepts(db, subjectName);
+	if (!due.length)
+		return console.log(
+			`No concepts due for reinforcement${subjectName ? ` in ${subjectName}` : ""}.`,
+		);
+	console.log(`Concepts due for reinforcement (${due.length}):`);
+	for (const d of due)
+		console.log(
+			`  [${d.status ?? "new"}] ${d.name}  (${d.overdue}d overdue)  -> explain / quiz / read / cards`,
+		);
+}
+
+// Manual placement override (probe sets this automatically from a score).
+function setStatus(
+	subjectName?: string,
+	conceptName?: string,
+	statusArg?: string,
+) {
+	const valid = ["blank", "shaky", "known"];
+	if (!subjectName || !conceptName || !statusArg || !valid.includes(statusArg))
+		return console.log(
+			`Usage: mark "<subject>" "<concept>" <${valid.join("|")}>`,
+		);
+	const subject = getSubject(subjectName);
+	if (!subject) return console.log(`No subject: ${subjectName}`);
+	const concept = getConcept(subject.id, conceptName);
+	if (!concept)
+		return console.log(`No concept "${conceptName}" in ${subjectName}.`);
+	db.run("UPDATE concepts SET status = ? WHERE id = ?", [
+		statusArg,
+		concept.id,
+	]);
+	console.log(`${subjectName} / ${conceptName} marked ${statusArg}.`);
+}
+
 // ---- session notes (the conversational stream) ------------------------------
 
 // Capture a short, LLM-authored note at the END of a working session — what was
@@ -547,8 +656,11 @@ function exportJson(subjectName?: string) {
 			masteredAt: s.mastered_at,
 			blocking: m.blocking,
 			dueCount: dueCount(s.name),
+			conceptsDue: dueConcepts(db, s.name),
 			concepts: db
-				.query("SELECT id, name FROM concepts WHERE subject_id = ? ORDER BY id")
+				.query(
+					"SELECT id, name, status, interval, last_exposed, next_exposure FROM concepts WHERE subject_id = ? ORDER BY id",
+				)
 				.all(s.id),
 			cards: db
 				.query(
@@ -757,8 +869,21 @@ function probe(
 			grader(),
 		],
 	);
+	// A probe places the concept (blank/shaky/known) AND is its first exposure —
+	// seeding the concept's spaced-reinforcement clock from the diagnostic.
+	db.run("UPDATE concepts SET status = ? WHERE id = ?", [
+		statusFromScore(score),
+		concept.id,
+	]);
+	recordExposure(
+		db,
+		concept.id,
+		kind === "explain" ? "explain" : "quiz",
+		scoreToQuality(score),
+		grader(),
+	);
 	console.log(
-		`probe recorded: ${subjectName} / ${conceptName} ${kind} ${score}/100 (${passed ? "proven" : "shaky"}). Tier: ${tierLabel(getSubject(subjectName) as SubjectRow)}`,
+		`probe recorded: ${subjectName} / ${conceptName} ${kind} ${score}/100 (${statusFromScore(score)}). Tier: ${tierLabel(getSubject(subjectName) as SubjectRow)}`,
 	);
 }
 
@@ -844,7 +969,9 @@ function nextTierName(tier: string): string {
 function resume() {
 	const subjects = allSubjects();
 	console.log("\n--- learn-it ---");
-	console.log(`Cards due today: ${dueCount()} (across all subjects)`);
+	console.log(
+		`Concepts to reinforce: ${dueConcepts(db).length}  |  cards due: ${dueCount()}  (all subjects)`,
+	);
 
 	if (!subjects.length) {
 		console.log('No subjects yet. Start one:  /learn-it init "<subject>"');
@@ -854,12 +981,17 @@ function resume() {
 	console.log("\nSubjects:");
 	for (const s of subjects) {
 		const phase = phaseOf(s);
-		const due = dueCount(s.name);
+		const cDue = dueConcepts(db, s.name).length;
+		const cardsDue = dueCount(s.name);
 		const next =
 			phase === "mastered" ? "done" : `next: ${PHASE_SUGGESTION[phase]}`;
-		console.log(
-			`  [${tierLabel(s)}] ${s.name}  (${due > 0 ? `${due} due` : "—"})  -> ${next}`,
-		);
+		const load = [
+			cDue > 0 ? `${cDue} concept${cDue > 1 ? "s" : ""} to reinforce` : "",
+			cardsDue > 0 ? `${cardsDue} cards due` : "",
+		]
+			.filter(Boolean)
+			.join(", ");
+		console.log(`  [${tierLabel(s)}] ${s.name}  (${load || "—"})  -> ${next}`);
 		// Carry context across sessions: the last thing the mentor noted.
 		const note = latestSession(s.id);
 		if (note) console.log(`        last session: ${note}`);
@@ -903,6 +1035,13 @@ function main() {
 			return setTarget(args[0], args[1]);
 		case "due":
 			return listDue(args[0]);
+		case "due-concepts":
+		case "reinforce":
+			return listDueConcepts(args[0]);
+		case "expose":
+			return expose(args[0], args[1], args[2], args[3]);
+		case "mark":
+			return setStatus(args[0], args[1], args[2]);
 		case "grade":
 			return grade(args[0], args[1]);
 		case "note":
@@ -922,13 +1061,14 @@ function main() {
 		default:
 			console.log(
 				"Usage: bun src/learn-it.ts <command>\n" +
-					"  state:   resume | mastery <s> | export [s] | doctor\n" +
-					"  subject: init <s> | target <s> <tier> | concepts <s> | advise <stage> <s>\n" +
-					"  concept: addconcept <s> <c> | delconcept <s> <c>\n" +
-					"  cards:   addcard <s> <c> <q> <a> | show <id> | editcard <id> <q> <a> | delcard <id> | suspend <id> [on|off]\n" +
-					"  review:  due [s] | grade <id> <0-5> | ungrade <id>\n" +
-					"  assess:  probe <s> <c> <explain|apply> <0-100> | assess <s> [kind] | evaluate <s> <kind> <0-100> [file]\n" +
-					"  session: note <s> <summary> | sessions <s>",
+					"  state:    resume | mastery <s> | export [s] | doctor\n" +
+					"  subject:  init <s> | target <s> <tier> | concepts <s> | advise <stage> <s>\n" +
+					"  concept:  addconcept <s> <c> | delconcept <s> <c> | mark <s> <c> <blank|shaky|known>\n" +
+					"  reinforce: due-concepts [s] | expose <s> <c> <explain|quiz|read|card> [0-5]\n" +
+					"  cards:    addcard <s> <c> <q> <a> | show <id> | editcard <id> <q> <a> | delcard <id> | suspend <id> [on|off]\n" +
+					"  review:   due [s] | grade <id> <0-5> | ungrade <id>\n" +
+					"  assess:   probe <s> <c> <explain|apply> <0-100> | assess <s> [kind] | evaluate <s> <kind> <0-100> [file]\n" +
+					"  session:  note <s> <summary> | sessions <s>",
 			);
 	}
 }
