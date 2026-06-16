@@ -22,13 +22,11 @@ import {
 	DREYFUS,
 	EVIDENCE_BLOOM,
 	type EvidenceKind,
+	masterySignals as gatherMasterySignals,
 	LONG_RETENTION_DAYS,
 	MATURE_INTERVAL_DAYS,
 	type MasterySignals,
 	PASS,
-	RETENTION_DAYS,
-	SUSTAINED_MIN_DAYS,
-	SUSTAINED_MIN_SPAN_DAYS,
 	tierIndexOf,
 } from "./mastery";
 import {
@@ -154,6 +152,16 @@ function readSignals(subject: SubjectRow): TopicSignals {
 			.get(subject.id) as { c: number }
 	).c;
 
+	// A concept is "diagnosed" once a probe has placed it (status set). Used by
+	// the watcher to nudge when teaching starts before the map is explored.
+	const diagnosed = (
+		db
+			.query(
+				"SELECT COUNT(*) AS c FROM concepts WHERE subject_id = ? AND status IS NOT NULL",
+			)
+			.get(subject.id) as { c: number }
+	).c;
+
 	return {
 		auditFilled,
 		hasRoadmap: fs.existsSync(path.join(dir, "roadmap.md")) || concepts > 0,
@@ -161,6 +169,8 @@ function readSignals(subject: SubjectRow): TopicSignals {
 		reviewedCount: stats.r ?? 0,
 		maturedCount: stats.m ?? 0,
 		hasAppliedEvidence: applied > 0,
+		roadmapConcepts: concepts,
+		diagnosedConcepts: diagnosed,
 		// Derive "mastered" from the LIVE tier, not the sticky mastered_at flag, so
 		// expanding the roadmap after mastering re-opens the subject instead of
 		// pinning phase to "mastered" forever. mastered_at remains a record of when
@@ -173,112 +183,11 @@ function phaseOf(subject: SubjectRow): Phase {
 	return inferPhase(readSignals(subject));
 }
 
-// Mastery rolls up over a subject's concepts + evidence. All from logged
-// performance — never self-reported. A concept is "covered" if touched by a
-// card or a concept-level probe; "proven" if retained (cards) OR backed by
-// passing evidence — so doing counts, not just flashcards.
+// Mastery rolls up over a subject's concepts + evidence, all from logged
+// performance — never self-reported. The roll-up itself lives in mastery.ts so
+// it stays unit-testable; this wrapper just binds it to the live db.
 function masterySignals(subject: SubjectRow): MasterySignals {
-	const sid = subject.id;
-	const concepts = (
-		db
-			.query("SELECT COUNT(*) AS c FROM concepts WHERE subject_id = ?")
-			.get(sid) as { c: number }
-	).c;
-
-	// "Covered" = engaged, not merely populated: a card counts only once it has
-	// been reviewed at least once (repetitions >= 1), OR the concept has passing
-	// evidence. A bare unreviewed card is not coverage — that keeps volume from
-	// nudging the coverage gates (CLAUDE.md: "Volume never lifts a tier").
-	const covered = (
-		db
-			.query(
-				`SELECT COUNT(*) AS c FROM (
-           SELECT concept_id FROM flashcards WHERE subject_id = ? AND repetitions >= 1
-           UNION
-           SELECT concept_id FROM exposures WHERE subject_id = ?
-           UNION
-           SELECT concept_id FROM evidence
-             WHERE subject_id = ? AND concept_id IS NOT NULL AND passed = 1
-         )`,
-			)
-			.get(sid, sid, sid) as { c: number }
-	).c;
-
-	// A concept is proven by retention across a real gap — through cards OR
-	// through retrieval exposures (re-explain / quiz), counted symmetrically — OR
-	// by passing concept-level evidence. `read` is recognition and is excluded.
-	const proven = (
-		db
-			.query(
-				`SELECT COUNT(*) AS c FROM (
-           SELECT concept_id FROM reviews
-             WHERE subject_id = ? AND quality >= 3 AND interval_before >= ?
-           UNION
-           SELECT concept_id FROM exposures
-             WHERE subject_id = ? AND surface IN ('explain','quiz','card')
-               AND quality >= 3 AND interval_before >= ?
-           UNION
-           SELECT concept_id FROM evidence
-             WHERE subject_id = ? AND concept_id IS NOT NULL AND passed = 1
-         )`,
-			)
-			.get(sid, RETENTION_DAYS, sid, RETENTION_DAYS, sid) as { c: number }
-	).c;
-
-	const longRet = (
-		db
-			.query(
-				`SELECT COUNT(*) AS c FROM (
-           SELECT concept_id FROM reviews
-             WHERE subject_id = ? AND quality >= 3 AND interval_before >= ?
-           UNION
-           SELECT concept_id FROM exposures
-             WHERE subject_id = ? AND surface IN ('explain','quiz','card')
-               AND quality >= 3 AND interval_before >= ?
-         )`,
-			)
-			.get(sid, LONG_RETENTION_DAYS, sid, LONG_RETENTION_DAYS) as { c: number }
-	).c;
-
-	const apply = db
-		.query(
-			"SELECT MAX(score) AS best, MAX(passed) AS passed FROM evidence WHERE subject_id = ? AND kind = 'apply'",
-		)
-		.get(sid) as { best: number | null; passed: number | null };
-
-	const passedOf = (kind: EvidenceKind) =>
-		((
-			db
-				.query(
-					"SELECT MAX(passed) AS p FROM evidence WHERE subject_id = ? AND kind = ?",
-				)
-				.get(sid, kind) as { p: number | null }
-		).p ?? 0) === 1;
-
-	// Durability-over-time: passing apply/build on N distinct days, spanning M+.
-	const span = db
-		.query(
-			"SELECT COUNT(DISTINCT at) AS days, MIN(at) AS first, MAX(at) AS last FROM evidence WHERE subject_id = ? AND passed = 1 AND kind IN ('apply','build')",
-		)
-		.get(sid) as { days: number; first: string | null; last: string | null };
-	const spanDays =
-		span.first && span.last
-			? (Date.parse(span.last) - Date.parse(span.first)) / 86_400_000
-			: 0;
-	const sustainedEvidence =
-		span.days >= SUSTAINED_MIN_DAYS && spanDays >= SUSTAINED_MIN_SPAN_DAYS;
-
-	return {
-		concepts,
-		coveredConcepts: covered,
-		provenConcepts: proven,
-		longRetainedConcepts: longRet,
-		bestApply: apply.best ?? 0,
-		applyPassed: (apply.passed ?? 0) === 1,
-		explainPassed: passedOf("explain"),
-		buildPassed: passedOf("build"),
-		sustainedEvidence,
-	};
+	return gatherMasterySignals(db, subject.id);
 }
 
 function tierLabel(subject: SubjectRow): string {
@@ -305,8 +214,10 @@ function initSubject(name?: string) {
 	}
 }
 
-// Register a roadmap leaf. `plan` calls this per concept it generates; coverage
-// and mastery are measured against this list.
+// Register a roadmap leaf (idempotent — a duplicate name is reported, not
+// re-inserted). `explore-topic` registers the candidate map; `plan` only adds
+// leaves it split out or removes ones it dropped. Coverage and mastery are
+// measured against this list.
 function addConcept(subjectName?: string, conceptName?: string) {
 	if (!subjectName || !conceptName)
 		return console.log('Usage: addconcept "<subject>" "<concept>"');

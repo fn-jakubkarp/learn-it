@@ -9,6 +9,8 @@ const base: TopicSignals = {
 	maturedCount: 0,
 	hasAppliedEvidence: false,
 	mastered: false,
+	roadmapConcepts: 0,
+	diagnosedConcepts: 0,
 };
 const sig = (o: Partial<TopicSignals>): TopicSignals => ({ ...base, ...o });
 
@@ -108,5 +110,27 @@ describe("advise — nudges, never blocks", () => {
 	test("concept is always recommended (notes are a tool, not a gate)", () => {
 		const a = advise("concept", "conceptualize", sig({ auditFilled: true }));
 		expect(a.recommended).toBe(true);
+	});
+
+	test("teaching with most of the roadmap undiagnosed nudges (but never blocks)", () => {
+		// The real-run bug: probed 3/8 concepts, then jumped to teaching.
+		const a = advise(
+			"concept",
+			"conceptualize",
+			sig({ auditFilled: true, roadmapConcepts: 8, diagnosedConcepts: 3 }),
+		);
+		expect(a.recommended).toBe(true); // advises, never blocks
+		expect(a.note).toContain("3/8");
+		expect(a.note).toContain("explore-gaps");
+	});
+
+	test("once most concepts are diagnosed, teaching draws no nudge", () => {
+		const a = advise(
+			"concept",
+			"conceptualize",
+			sig({ auditFilled: true, roadmapConcepts: 8, diagnosedConcepts: 5 }),
+		);
+		expect(a.recommended).toBe(true);
+		expect(a.note).not.toContain("explore-gaps");
 	});
 });

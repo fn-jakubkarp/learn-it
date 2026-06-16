@@ -1,9 +1,37 @@
+import type { Database } from "bun:sqlite";
 import { describe, expect, test } from "bun:test";
 import {
 	assessMastery,
 	type MasterySignals,
+	masterySignals,
 	tierIndexOf,
 } from "../src/mastery";
+import { makeDb } from "./helpers";
+
+// Mirror src/learn-it.ts scoreToQuality so the test probes the way probe() does.
+const scoreToQuality = (s: number): number =>
+	s >= 85 ? 5 : s >= 70 ? 4 : s >= 40 ? 3 : 1;
+
+// Record one probe exactly as probe() does: an evidence row (passed by >= 70)
+// plus a first-exposure row at interval_before 0 with quality from the score.
+function probeInto(db: Database, conceptId: number, score: number) {
+	const passed = score >= 70 ? 1 : 0;
+	db.run(
+		"INSERT INTO evidence (subject_id, concept_id, kind, bloom, score, passed) VALUES (1, ?, 'explain', 2, ?, ?)",
+		[conceptId, score, passed],
+	);
+	db.run(
+		"INSERT INTO exposures (concept_id, subject_id, surface, quality, interval_before, interval_after) VALUES (?, 1, 'explain', ?, 0, 1)",
+		[conceptId, scoreToQuality(score)],
+	);
+}
+
+function withConcepts(n: number): Database {
+	const { db } = makeDb(); // seeds concept id 1
+	for (let i = 2; i <= n; i++)
+		db.run("INSERT INTO concepts (subject_id, name) VALUES (1, ?)", [`c${i}`]);
+	return db;
+}
 
 const base: MasterySignals = {
 	concepts: 0,
@@ -143,5 +171,44 @@ describe("assessMastery — the expert gate is brutal", () => {
 			}),
 		);
 		expect(m.tier).not.toBe("expert");
+	});
+});
+
+describe("masterySignals — a failed probe is a gap marker, not coverage", () => {
+	test("BLANK probes don't count as coverage (regression: % can't ride on bombing)", () => {
+		// The real run: 8 concepts, probed 3 at 45 / 30 / 20. Only the 45 (shaky)
+		// is a partial retrieval success; 30 and 20 are blanks. Pre-fix all three
+		// counted as coverage and the displayed % climbed 13 -> 25 -> 38 as the
+		// learner bombed MORE concepts. Now only the shaky one covers.
+		const db = withConcepts(8);
+		probeInto(db, 1, 45); // shaky  -> quality 3 -> covered
+		probeInto(db, 2, 30); // blank  -> quality 1 -> NOT covered
+		probeInto(db, 3, 20); // blank  -> quality 1 -> NOT covered
+
+		const s = masterySignals(db, 1);
+		expect(s.concepts).toBe(8);
+		expect(s.coveredConcepts).toBe(1); // was 3 before the fix
+		expect(s.provenConcepts).toBe(0); // no retention gap cleared
+
+		const m = assessMastery(s);
+		expect(m.tier).toBe("advanced-beginner");
+		expect(m.withinTier).toBe(13); // was 38 before the fix
+	});
+
+	test("more blank probes add ZERO coverage — volume can't move the number", () => {
+		const db = withConcepts(8);
+		const a = assessMastery(masterySignals(db, 1)).withinTier;
+		for (const c of [1, 2, 3, 4, 5]) probeInto(db, c, 20); // 5 blanks
+		const b = assessMastery(masterySignals(db, 1)).withinTier;
+		expect(b).toBe(a); // bombing five concepts moved nothing
+		expect(masterySignals(db, 1).coveredConcepts).toBe(0);
+	});
+
+	test("a shaky probe covers; a passing probe covers via passing evidence", () => {
+		const db = withConcepts(4);
+		probeInto(db, 1, 55); // shaky  -> quality 3 -> covered
+		probeInto(db, 2, 80); // known  -> passed=1  -> covered
+		probeInto(db, 3, 20); // blank  -> not covered
+		expect(masterySignals(db, 1).coveredConcepts).toBe(2);
 	});
 });

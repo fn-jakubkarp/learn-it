@@ -33,6 +33,8 @@ export interface TopicSignals {
 	maturedCount: number; // cards settled into long-term (interval >= 7d)
 	hasAppliedEvidence: boolean; // passed an apply/build assessment or probe
 	mastered: boolean;
+	roadmapConcepts: number; // registered concepts (the roadmap size)
+	diagnosedConcepts: number; // concepts placed by a probe (status set)
 }
 
 // The stage(s) to suggest when a topic sits at a given phase.
@@ -96,7 +98,17 @@ export function advise(stage: string, phase: Phase, s: TopicSignals): Advice {
 					note: "audit is empty — the roadmap will be generic. Fill the topic's audit.md first for a tailored plan.",
 				};
 			return ok;
-		case "concept":
+		case "concept": {
+			// Teaching before the map is diagnosed wastes effort: untested concepts
+			// start at novice, so you risk re-teaching what the learner already knows
+			// or skipping a missing prerequisite. The watcher surfaces this when most
+			// of the roadmap is still unprobed — but NEVER blocks (the learner may
+			// deliberately teach the few they've placed). Diagnose-before-teach.
+			if (s.roadmapConcepts > 0 && s.diagnosedConcepts * 2 < s.roadmapConcepts)
+				return {
+					recommended: true,
+					note: `only ${s.diagnosedConcepts}/${s.roadmapConcepts} concepts diagnosed — the rest will start at novice. Finish explore-gaps for accurate placement, or proceed deliberately on a known-weak concept.`,
+				};
 			// Notes are a TOOL, never a gate. The generation effect favours notes
 			// the learner writes themselves, but mastery is measured by evidence and
 			// retention — not by notes — so a learner who would rather be tested can
@@ -106,6 +118,7 @@ export function advise(stage: string, phase: Phase, s: TopicSignals): Advice {
 				recommended: true,
 				note: "notes are optional — write your own (they retain best) or skip to probe/assess to be tested instead.",
 			};
+		}
 		case "extract":
 			if (s.cardCount === 0 && !s.hasRoadmap)
 				return {

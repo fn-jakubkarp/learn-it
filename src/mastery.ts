@@ -17,6 +17,8 @@
 // signal comes from the append-only reviews / evidence tables — demonstrated,
 // not self-reported.
 
+import type { Database } from "bun:sqlite";
+
 export const DREYFUS = [
 	"novice",
 	"advanced-beginner",
@@ -43,6 +45,14 @@ export const MATURE_INTERVAL_DAYS = 7;
 export const RETENTION_DAYS = 21;
 export const LONG_RETENTION_DAYS = 60;
 export const PASS = 70; // evidence at/above this passes; 90+ needed for expert
+
+// The retrieval-quality bar a recall must clear to COUNT — for coverage and for
+// proven alike. Set to the "shaky" rung of scoreToQuality (score >= 40): the
+// learner showed at least partial, real retrieval. Below it (a blank/failed
+// probe, quality 1) is a GAP marker, never engagement — so it can't nudge a
+// tier gate. Keeps the coverage gates honest: being quizzed and bombing is not
+// "covering" a concept (CLAUDE.md: "Volume never lifts a tier").
+export const STRONG_RECALL_QUALITY = 3;
 
 // "Durability via repeated evidence" alternative to long retention: passing
 // apply/build evidence on at least this many distinct days, spanning at least
@@ -188,4 +198,124 @@ export function assessMastery(s: MasterySignals): MasteryResult {
 // Index of a tier name, or -1. Used to compare current vs target.
 export function tierIndexOf(tier: string): number {
 	return (DREYFUS as readonly string[]).indexOf(tier);
+}
+
+// Roll a subject's raw signals out of the append-only tables. Lives HERE, not in
+// the CLI module, so it can be unit-tested against an in-memory db — importing
+// learn-it.ts would run its top-level main() and open the real db. Pure read.
+export function masterySignals(
+	db: Database,
+	subjectId: number,
+): MasterySignals {
+	const concepts = (
+		db
+			.query("SELECT COUNT(*) AS c FROM concepts WHERE subject_id = ?")
+			.get(subjectId) as { c: number }
+	).c;
+
+	// "Covered" = engaged with at least a partial RETRIEVAL SUCCESS, not merely
+	// touched: a reviewed card (repetitions >= 1), a passing concept-level
+	// assessment, OR a retrieval exposure that cleared the success bar
+	// (quality >= STRONG_RECALL_QUALITY). A bare unreviewed card and a blank/
+	// failed probe are both GAP markers, not coverage — counting them would let
+	// volume (cards stacked, or probes bombed) nudge the coverage gates, exactly
+	// what CLAUDE.md forbids ("Volume never lifts a tier").
+	const covered = (
+		db
+			.query(
+				`SELECT COUNT(*) AS c FROM (
+           SELECT concept_id FROM flashcards WHERE subject_id = ? AND repetitions >= 1
+           UNION
+           SELECT concept_id FROM exposures WHERE subject_id = ? AND quality >= ${STRONG_RECALL_QUALITY}
+           UNION
+           SELECT concept_id FROM evidence
+             WHERE subject_id = ? AND concept_id IS NOT NULL AND passed = 1
+         )`,
+			)
+			.get(subjectId, subjectId, subjectId) as { c: number }
+	).c;
+
+	// A concept is proven by retention across a real gap — through cards OR
+	// through retrieval exposures (re-explain / quiz), counted symmetrically — OR
+	// by passing concept-level evidence. `read` is recognition and is excluded.
+	const proven = (
+		db
+			.query(
+				`SELECT COUNT(*) AS c FROM (
+           SELECT concept_id FROM reviews
+             WHERE subject_id = ? AND quality >= ${STRONG_RECALL_QUALITY} AND interval_before >= ?
+           UNION
+           SELECT concept_id FROM exposures
+             WHERE subject_id = ? AND surface IN ('explain','quiz','card')
+               AND quality >= ${STRONG_RECALL_QUALITY} AND interval_before >= ?
+           UNION
+           SELECT concept_id FROM evidence
+             WHERE subject_id = ? AND concept_id IS NOT NULL AND passed = 1
+         )`,
+			)
+			.get(subjectId, RETENTION_DAYS, subjectId, RETENTION_DAYS, subjectId) as {
+			c: number;
+		}
+	).c;
+
+	const longRet = (
+		db
+			.query(
+				`SELECT COUNT(*) AS c FROM (
+           SELECT concept_id FROM reviews
+             WHERE subject_id = ? AND quality >= ${STRONG_RECALL_QUALITY} AND interval_before >= ?
+           UNION
+           SELECT concept_id FROM exposures
+             WHERE subject_id = ? AND surface IN ('explain','quiz','card')
+               AND quality >= ${STRONG_RECALL_QUALITY} AND interval_before >= ?
+         )`,
+			)
+			.get(subjectId, LONG_RETENTION_DAYS, subjectId, LONG_RETENTION_DAYS) as {
+			c: number;
+		}
+	).c;
+
+	const apply = db
+		.query(
+			"SELECT MAX(score) AS best, MAX(passed) AS passed FROM evidence WHERE subject_id = ? AND kind = 'apply'",
+		)
+		.get(subjectId) as { best: number | null; passed: number | null };
+
+	const passedOf = (kind: EvidenceKind) =>
+		((
+			db
+				.query(
+					"SELECT MAX(passed) AS p FROM evidence WHERE subject_id = ? AND kind = ?",
+				)
+				.get(subjectId, kind) as { p: number | null }
+		).p ?? 0) === 1;
+
+	// Durability-over-time: passing apply/build on N distinct days, spanning M+.
+	const span = db
+		.query(
+			"SELECT COUNT(DISTINCT at) AS days, MIN(at) AS first, MAX(at) AS last FROM evidence WHERE subject_id = ? AND passed = 1 AND kind IN ('apply','build')",
+		)
+		.get(subjectId) as {
+		days: number;
+		first: string | null;
+		last: string | null;
+	};
+	const spanDays =
+		span.first && span.last
+			? (Date.parse(span.last) - Date.parse(span.first)) / 86_400_000
+			: 0;
+	const sustainedEvidence =
+		span.days >= SUSTAINED_MIN_DAYS && spanDays >= SUSTAINED_MIN_SPAN_DAYS;
+
+	return {
+		concepts,
+		coveredConcepts: covered,
+		provenConcepts: proven,
+		longRetainedConcepts: longRet,
+		bestApply: apply.best ?? 0,
+		applyPassed: (apply.passed ?? 0) === 1,
+		explainPassed: passedOf("explain"),
+		buildPassed: passedOf("build"),
+		sustainedEvidence,
+	};
 }

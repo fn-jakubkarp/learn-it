@@ -64,6 +64,18 @@ export function makeDb(): {
        FOREIGN KEY (subject_id) REFERENCES subjects(id)
      );`,
 	);
+	db.run(
+		`CREATE TABLE evidence (
+       id INTEGER PRIMARY KEY AUTOINCREMENT,
+       subject_id INTEGER NOT NULL, concept_id INTEGER,
+       kind TEXT NOT NULL, bloom INTEGER NOT NULL,
+       score INTEGER NOT NULL, passed INTEGER NOT NULL,
+       source_file TEXT, grader TEXT DEFAULT 'unpinned',
+       at TEXT DEFAULT CURRENT_DATE,
+       FOREIGN KEY (subject_id) REFERENCES subjects(id),
+       FOREIGN KEY (concept_id) REFERENCES concepts(id)
+     );`,
+	);
 	db.run("INSERT INTO subjects (name) VALUES ('t')");
 	const subjectId = 1;
 	db.run("INSERT INTO concepts (subject_id, name) VALUES (?, 'c')", [
