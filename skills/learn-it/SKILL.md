@@ -127,16 +127,13 @@ bun src/learn-it.ts mastery "{subject}"     # tier, % to next tier, exactly what
 - **Action**: `bun src/learn-it.ts init "{subject}"`. Confirm `subjects/{subject}/audit.md` is ready to fill.
 
 ### /learn-it explore-topic {subject}
-- **Action**: Read `stages/explore-topic.md`. Map the subject into concepts and register them (`addconcept`); write the map to `roadmap.md`. Refines the audit rather than trusting it.
+- **Action**: Read `stages/explore-topic.md`. Map the subject into a **candidate** concept list and register each (`addconcept` — so `explore-gaps` has something to probe); write the map to `roadmap.md`. Refines the audit rather than trusting it. `plan` reconciles it later — don't over-polish here.
 
 ### /learn-it explore-gaps {subject}
-- **Action**: Read `stages/explore-gaps.md`. Probe the learner across the concepts at rising difficulty; record each with `probe` (places them at their real level, up to proficient). Write calibrated findings to `audit.md`; optionally set a `target`.
+- **Action**: Read `stages/explore-gaps.md`. Probe the learner **one concept at a time at rising difficulty** until they fall off (never batch questions); record each with `probe` (places them at their real level, up to proficient). Write calibrated findings to `audit.md`; **set a `target` if the learner stated a goal.**
 
 ### /learn-it plan {subject}
-- **Action**: Read `stages/plan.md` + `subjects/{subject}/audit.md`. Write `subjects/{subject}/roadmap.md`, then **register every roadmap leaf as a concept** (coverage and mastery measure against these):
-  ```bash
-  bun src/learn-it.ts addconcept "{subject}" "{concept}"
-  ```
+- **Action**: Read `stages/plan.md` + `subjects/{subject}/audit.md`. **Reconcile** the candidate map with the probe findings (the candidates are already registered): apply only the deltas (`addconcept` new splits, `delconcept` dropped leaves), order `subjects/{subject}/roadmap.md` foundation-first, and confirm the `target`. `concepts "{subject}"` must match `roadmap.md`. Confirming the map unchanged is a valid outcome.
 
 ### /learn-it concept {term}
 - **Action**: Read `stages/concept.md`. Explain via analogy and mechanism (no dry definitions). Append insights to `subjects/{subject}/notes.md`.

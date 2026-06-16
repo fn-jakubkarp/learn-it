@@ -11,6 +11,8 @@ description: Build the big picture by analogy and mechanism — no dry definitio
 
 **When to skip:** if the learner already applies it (a passing `apply` probe) or simply wants to be tested, go straight to `extract`/`probe`. This stage is for genuinely new or shaky concepts. Notes are never a gate.
 
+**Before you teach — is the map diagnosed?** Don't slide from a partial diagnosis straight into a lesson. If most of the roadmap is still unprobed (`advise concept "<subject>"` will say so), surface it and let the learner choose: finish `explore-gaps` for accurate placement, or deliberately teach a *specific* known-weak concept now. Pick the weakest diagnosed concept to teach, not the first on the list. Never silently assume an untested concept is novel.
+
 ## Method
 1. **Why does this exist?** Open with the problem the concept solves — what breaks, or what's painful, without it. Motivation before mechanism; an unmotivated concept doesn't stick.
 2. **One analogy, fully mapped.** Pick a system the learner already knows and map it part-for-part. State the mapping explicitly — *and* state where it BREAKS. An unbounded analogy quietly teaches the wrong thing.
