@@ -1,0 +1,17 @@
+{
+	"name": "learn-it",
+	"metadata": {
+		"description": "Cognitive learning engine — FSRS spaced repetition, active recall, and harsh, un-gameable mastery scored from what you actually demonstrate."
+	},
+	"owner": {
+		"name": "jakubkarp"
+	},
+	"plugins": [
+		{
+			"name": "learn-it",
+			"source": "./",
+			"description": "Subjects → concepts, an FSRS scheduler, session notes, and harsh per-subject Dreyfus mastery computed from logged performance. The /learn-it skill drives a thin CLI.",
+			"category": "productivity"
+		}
+	]
+}

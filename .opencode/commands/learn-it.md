@@ -1,0 +1,21 @@
+---
+description: learn-it — cognitive learning engine (router). No arg = dashboard; or name a stage.
+---
+You are running the learn-it skill. Read the canonical router at
+`.agents/skills/learn-it/SKILL.md` and follow it exactly, then act on the
+argument below.
+
+- Prerequisite: Bun installed. The database auto-initializes on the first
+  `bun src/learn-it.ts` run — no manual `init-db` step needed.
+- Always begin with state: run `bun src/learn-it.ts` and surface it as-is.
+- With no argument, show the dashboard + command menu.
+- Otherwise the argument names a stage (init | explore-topic | explore-gaps |
+  plan | concept | reinforce | quiz | extract | review | feynman | exam |
+  assess | evaluate | mastery); read its `stages/` prompt where one exists and
+  run the commands it specifies.
+- Honor the invariants in `AGENTS.md` / `CLAUDE.md`: mastery is computed from
+  logged performance (never self-reported), the watcher advises and never
+  blocks, and every `grade` / `evaluate` / `probe` is prefixed with
+  `LEARN_IT_GRADER="<your-model-id>"`.
+
+Argument: $ARGUMENTS
