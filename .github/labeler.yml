@@ -1,0 +1,28 @@
+# Add 'core' label to any changes within the 'src' folder
+core:
+  - changed-files:
+      - any-glob-to-any-file: 'src/**/*'
+
+# Add 'documentation' label to any changes within docs or markdown files
+documentation:
+  - changed-files:
+      - any-glob-to-any-file: 
+          - 'docs/**/*'
+          - '**/*.md'
+
+# Add 'testing' label to any changes within tests folder
+testing:
+  - changed-files:
+      - any-glob-to-any-file: 'tests/**/*'
+
+# Add 'dependencies' label to any changes in package files
+dependencies:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'package.json'
+          - 'bun.lock'
+
+# Add 'ci' label to any changes in workflows
+ci:
+  - changed-files:
+      - any-glob-to-any-file: '.github/workflows/**/*'
