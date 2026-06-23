@@ -1,0 +1,130 @@
+# Changelog
+
+All notable changes to this project are documented here.
+Format follows [Keep a Changelog](https://keepachangelog.com/); the project is
+pre-1.0, so the public surface may still shift.
+
+The git history was squashed to a few release commits after `0.1.0`; this file is
+the canonical record of how the project was built.
+
+## [Unreleased]
+
+## [0.1.0] - 2026-06-23
+
+Public release.
+
+### Added
+
+- **One-command installers** - `install.sh` (`curl … | bash`) and `install.ps1`
+  (`irm … | iex`): install Bun if missing, clone (or reuse a checkout), install
+  deps, create the database.
+- **README rewrite + 5-language i18n** - concise rewrite with a full stage
+  reference and OS-specific install steps, plus localized READMEs (zh, es, pl,
+  ja, de) and a language switcher.
+- `package.json` release metadata - description, MIT license, author,
+  repository/homepage/bugs URLs, keywords.
+
+## [0.0.4] - 2026-06-17
+
+### Added
+
+- **Auto-init self-heal** - the database initializes on first run from any CLI;
+  explicit `bun src/init-db.ts` is needed only to migrate an existing db.
+- **CLI-agnostic skill** - one canonical `SKILL.md` under `.agents/`, symlinked
+  into Claude / Qwen / OpenCode skill dirs with per-tool command glue, plus an
+  `AGENTS.md` cross-tool entry (`GEMINI.md` points at it).
+- Read-only `db` inspector command (its own `readonly` connection - can't mutate).
+- Concept placement glyphs in concept listings.
+- `/learn-it` launches the web dashboard.
+
+### Changed
+
+- Lighter audit framing + an AI-primer nudge to beat blank-page friction.
+
+## [0.0.3] - 2026-06-16
+
+Repair the "mastery can't be gamed" thesis and broaden the tooling
+(PRs #2 and #3).
+
+### Added
+
+- **Concept-level spaced exposure engine** (`src/exposure.ts`) - spacing lives on
+  the *concept*, not the flashcard. Each concept carries its own FSRS clock
+  advanced by any surface (`expose <subject> <concept> <explain|quiz|read|card>`);
+  `explain`/`quiz`/`card` are retrieval, `read` is capped recognition.
+  `due-concepts` (alias `reinforce`) is the primary "what to reinforce now" queue.
+  Cards demoted to one surface among many.
+- **Card & concept management** - `show`, `editcard`, `delcard`, `delconcept`,
+  `suspend`, and `ungrade` (undo the last grade by replaying the recall log).
+- **Session notes** - `note` / `sessions` capture an LLM-authored summary;
+  `resume` surfaces the latest per subject so the next session resumes with
+  context.
+- `export` (full learner state as JSON) and `doctor` (schema / pragma / grader /
+  orphan health check).
+- **Local web dashboard** (`bun src/dashboard.ts`) - zero-dependency `Bun.serve`
+  watcher + flashcard review engine; its grades log `grader = "dashboard"`.
+- **Test suite** (`bun test`) for scheduler, mastery, and lifecycle - including
+  the anti-grind invariant and expert-gate boundaries - plus a CI workflow
+  (Biome + `tsc` + tests) and plugin packaging.
+- Home **assessment tracking** (pending → done) surfaced on both dashboards;
+  `stages/assess.md`.
+- Proper `audit.md` template and frontmatter on all learner markdown.
+- Adaptive probing / diagnose-before-teach stage prompts; a makefile-style
+  command menu on bare invocation.
+
+### Fixed
+
+- **FSRS now scores retention by real elapsed time.** The scheduler tracks
+  `last_reviewed` and uses `today − last_reviewed`, so **same-day re-grading can
+  no longer manufacture "proven" retention** - a 0-day gap never crosses the
+  proven bar. This closes the main gap in the mastery thesis.
+- **`mastered_at` no longer latches phase** - phase re-derives from the live tier,
+  so expanding a roadmap after expert re-opens the subject.
+- **Coverage requires engagement** - a concept counts as covered only once a card
+  is reviewed (or it has passing evidence); bare unreviewed cards don't nudge
+  tier gates.
+- **Failed probes no longer inflate coverage**; premature teaching is flagged.
+- Friendly errors and source-relative DB paths; foreign-key enforcement on, WAL +
+  `busy_timeout` for safe back-to-back CLI invocations.
+
+### Changed
+
+- Grader provenance recorded on every score.
+- `SKILL.md` stripped to a route-only router (philosophy cut).
+
+## [0.0.2] - 2026-06-15
+
+### Added
+
+- **FSRS scheduler** logging every recall with the interval it survived.
+- **Performance-based Dreyfus mastery tiers** - computed from logged performance,
+  with no volume credit.
+- **Advisory lifecycle watcher** with an inferred, evidence-aware phase (advises,
+  never blocks).
+- CLI router for concepts, probes, assessments, and mastery.
+- Fixed assessment & rubric templates so scoring can't drift.
+- Diagnostic stages wiring prompts to concepts/evidence; the `/learn-it` skill.
+- `README`, `docs/ARCHITECTURE.md`, and `CLAUDE.md`.
+
+### Changed
+
+- Cognitive-science fixes (PR #1): replaced **SM-2 with FSRS**; interleave due
+  cards and teach on a miss; refute-first rubrics with score anchors; demoted
+  `anchor` to an optional tool.
+
+### Fixed
+
+- Corrected the Bloom level, dropped the Dunning-Kruger claim, and unified
+  thresholds.
+
+## [0.0.1] - 2026-06-14
+
+### Added
+
+- Project scaffold and initial mastery levels.
+- **2-tier subjects/concepts schema** with append-only `reviews` + `evidence`.
+- Data-hygiene `.gitignore` - ignore user data and output, keep the empty-dir
+  scaffolds.
+
+[Unreleased]: https://github.com/fn-jakubkarp/learn-it/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/fn-jakubkarp/learn-it/releases/tag/v0.1.0
