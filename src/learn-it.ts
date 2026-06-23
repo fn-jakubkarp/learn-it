@@ -1,0 +1,1317 @@
+import { Database } from "bun:sqlite";
+import fs from "node:fs";
+import path from "node:path";
+import {
+	type AssessmentRow,
+	assessmentsForSubject,
+	completeAssessment,
+	pendingAssessments,
+	recordAssessment,
+} from "./assessments";
+import {
+	type DueConcept,
+	dueConcepts,
+	isSurface,
+	recordExposure,
+	SURFACES,
+	type Surface,
+	statusFromScore,
+	statusGlyph,
+} from "./exposure";
+import {
+	ensureFrontmatter,
+	hasFrontmatter,
+	stripFrontmatter,
+	stripPrimer,
+} from "./frontmatter";
+import { DB_PATH, initDb } from "./init-db";
+import {
+	advise,
+	inferPhase,
+	PHASE_SUGGESTION,
+	type Phase,
+	type TopicSignals,
+} from "./lifecycle";
+import {
+	assessMastery,
+	DREYFUS,
+	EVIDENCE_BLOOM,
+	type EvidenceKind,
+	masterySignals as gatherMasterySignals,
+	LONG_RETENTION_DAYS,
+	MATURE_INTERVAL_DAYS,
+	type MasterySignals,
+	PASS,
+	tierIndexOf,
+} from "./mastery";
+import {
+	type CardRow,
+	getDueCards,
+	gradeCard,
+	replayCard,
+	today,
+} from "./scheduler";
+
+// Resolve the DB relative to THIS file, not the caller's cwd — otherwise running
+// from another directory silently CREATEs a fresh empty db there and abandons all
+// logged performance (the single source of truth for un-gameable mastery).
+// First run on a fresh checkout: self-heal by creating the schema instead of
+// bailing. initDb() resolves the same file-relative path, so it can't strand an
+// empty db elsewhere — keeping the tool zero-setup across every CLI (Claude Code,
+// Gemini, OpenCode, Qwen) without a per-tool session hook. The notice goes to
+// stderr so it never corrupts parseable stdout (e.g. `export` JSON).
+if (!fs.existsSync(DB_PATH)) {
+	console.error("learn-it: first run — initializing database…");
+	initDb();
+}
+const db = new Database(DB_PATH);
+// Match init-db: enforce FKs, use WAL, tolerate rapid back-to-back invocations.
+db.run("PRAGMA foreign_keys = ON");
+db.run("PRAGMA journal_mode = WAL");
+db.run("PRAGMA busy_timeout = 5000");
+
+const [command, ...args] = process.argv.slice(2);
+
+interface SubjectRow {
+	id: number;
+	name: string;
+	target_tier: string | null;
+	mastered_at: string | null;
+	created_at: string;
+}
+interface ConceptRow {
+	id: number;
+	subject_id: number;
+	name: string;
+	status: "known" | "shaky" | "blank" | null;
+}
+
+// The audit scaffold. Lives in templates/audit.md (frontmatter + Know/Vague/
+// Blank/Why buckets); this reads + fills it, with a built-in fallback so a
+// missing template never blocks `init`. Deterministic (no date) so the
+// emptiness check below can compare against it.
+function auditTemplate(name: string): string {
+	const tmpl = path.join(".", "templates", "audit.md");
+	if (fs.existsSync(tmpl))
+		return fs.readFileSync(tmpl, "utf8").replaceAll("{{subject}}", name);
+	return `---\ntype: audit\nsubject: ${name}\n---\n\n# Audit: ${name}\n\n## Know — could explain it cold\n- \n\n## Vague — heard of it, couldn't teach it\n- \n\n## Blank — don't know what I don't know\n- \n\n## Why I'm learning this (goal)\n- \n\n## A few areas this touches — a nudge, not a checklist\n<!-- PRIMER:START -->\n<!-- PRIMER:END -->\n`;
+}
+
+// The model that produced a score, recorded on every grade so harsh-mastery is
+// reproducible and auditable. Set once per session (e.g.
+// LEARN_IT_GRADER=claude-opus-4-8); when unset it logs 'unpinned' rather than
+// NULL, so a score with no provenance shows up in an audit instead of hiding.
+const grader = (): string => process.env.LEARN_IT_GRADER?.trim() || "unpinned";
+
+// Map a 0-100 assessment/probe score onto the 0-5 recall scale the exposure clock
+// uses, so a graded retrieval advances spacing like a card grade.
+const scoreToQuality = (s: number): number =>
+	s >= 85 ? 5 : s >= 70 ? 4 : s >= 40 ? 3 : 1;
+
+// Which assessment kind fits a phase, when the caller doesn't name one.
+const PHASE_KIND: Record<Phase, EvidenceKind> = {
+	diagnose: "explain",
+	conceptualize: "explain",
+	recall: "apply",
+	space: "apply",
+	verify: "apply",
+	mastered: "apply",
+};
+
+// ---- helpers ----------------------------------------------------------------
+
+function getSubject(name: string): SubjectRow | undefined {
+	return db.query("SELECT * FROM subjects WHERE name = ?").get(name) as
+		| SubjectRow
+		| undefined;
+}
+
+function getConcept(subjectId: number, name: string): ConceptRow | undefined {
+	return db
+		.query("SELECT * FROM concepts WHERE subject_id = ? AND name = ?")
+		.get(subjectId, name) as ConceptRow | undefined;
+}
+
+function allSubjects(): SubjectRow[] {
+	return db
+		.query("SELECT * FROM subjects ORDER BY created_at")
+		.all() as SubjectRow[];
+}
+
+function subjectDir(name: string): string {
+	return path.join(".", "subjects", name);
+}
+
+function dueCount(subjectName?: string): number {
+	return getDueCards(db, subjectName).length;
+}
+
+// Subject-level state for phase inference (phase is never stored).
+function readSignals(subject: SubjectRow): TopicSignals {
+	const dir = subjectDir(subject.name);
+	const auditPath = path.join(dir, "audit.md");
+	let auditFilled = false;
+	if (fs.existsSync(auditPath)) {
+		// Judge "filled" by the BODY, ignoring frontmatter AND the AI-written
+		// primer block — a pristine scaffold (even with a frontmatter header and a
+		// generated nudge list) is still an empty audit. Only the learner's own
+		// words count.
+		const body = stripPrimer(
+			stripFrontmatter(fs.readFileSync(auditPath, "utf8")),
+		).trim();
+		auditFilled =
+			body.length > 0 &&
+			body !==
+				stripPrimer(stripFrontmatter(auditTemplate(subject.name))).trim();
+	}
+
+	const concepts = (
+		db
+			.query("SELECT COUNT(*) AS c FROM concepts WHERE subject_id = ?")
+			.get(subject.id) as { c: number }
+	).c;
+
+	const stats = db
+		.query(
+			`SELECT COUNT(*) AS c,
+              SUM(CASE WHEN repetitions >= 1 THEN 1 ELSE 0 END) AS r,
+              SUM(CASE WHEN interval >= ${MATURE_INTERVAL_DAYS} THEN 1 ELSE 0 END) AS m
+       FROM flashcards WHERE subject_id = ?`,
+		)
+		.get(subject.id) as { c: number; r: number | null; m: number | null };
+
+	const applied = (
+		db
+			.query(
+				"SELECT COUNT(*) AS c FROM evidence WHERE subject_id = ? AND passed = 1 AND kind IN ('apply','build')",
+			)
+			.get(subject.id) as { c: number }
+	).c;
+
+	// A concept is "diagnosed" once a probe has placed it (status set). Used by
+	// the watcher to nudge when teaching starts before the map is explored.
+	const diagnosed = (
+		db
+			.query(
+				"SELECT COUNT(*) AS c FROM concepts WHERE subject_id = ? AND status IS NOT NULL",
+			)
+			.get(subject.id) as { c: number }
+	).c;
+
+	return {
+		auditFilled,
+		hasRoadmap: fs.existsSync(path.join(dir, "roadmap.md")) || concepts > 0,
+		cardCount: stats.c ?? 0,
+		reviewedCount: stats.r ?? 0,
+		maturedCount: stats.m ?? 0,
+		hasAppliedEvidence: applied > 0,
+		roadmapConcepts: concepts,
+		diagnosedConcepts: diagnosed,
+		// Derive "mastered" from the LIVE tier, not the sticky mastered_at flag, so
+		// expanding the roadmap after mastering re-opens the subject instead of
+		// pinning phase to "mastered" forever. mastered_at remains a record of when
+		// expert was first reached (see stampMasteredIfExpert), not a phase latch.
+		mastered: assessMastery(masterySignals(subject)).tier === "expert",
+	};
+}
+
+function phaseOf(subject: SubjectRow): Phase {
+	return inferPhase(readSignals(subject));
+}
+
+// Mastery rolls up over a subject's concepts + evidence, all from logged
+// performance — never self-reported. The roll-up itself lives in mastery.ts so
+// it stays unit-testable; this wrapper just binds it to the live db.
+function masterySignals(subject: SubjectRow): MasterySignals {
+	return gatherMasterySignals(db, subject.id);
+}
+
+function tierLabel(subject: SubjectRow): string {
+	const m = assessMastery(masterySignals(subject));
+	return m.tier === "expert" ? "expert ★" : `${m.tier} ${m.withinTier}%`;
+}
+
+// ---- commands ---------------------------------------------------------------
+
+function initSubject(name?: string) {
+	if (!name) return console.log('Usage: init "<subject>"');
+	const dir = subjectDir(name);
+	if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+	const auditPath = path.join(dir, "audit.md");
+	if (!fs.existsSync(auditPath))
+		fs.writeFileSync(auditPath, auditTemplate(name));
+	try {
+		db.run("INSERT INTO subjects (name) VALUES (?)", [name]);
+		console.log(
+			`Initialized subject: ${name}. Fill ${auditPath}, then: explore-topic`,
+		);
+	} catch {
+		console.log(`Subject ${name} already exists.`);
+	}
+}
+
+// Register a roadmap leaf (idempotent — a duplicate name is reported, not
+// re-inserted). `explore-topic` registers the candidate map; `plan` only adds
+// leaves it split out or removes ones it dropped. Coverage and mastery are
+// measured against this list.
+function addConcept(subjectName?: string, conceptName?: string) {
+	if (!subjectName || !conceptName)
+		return console.log('Usage: addconcept "<subject>" "<concept>"');
+	const subject = getSubject(subjectName);
+	if (!subject) return console.log(`No subject: ${subjectName}`);
+	try {
+		db.run("INSERT INTO concepts (subject_id, name) VALUES (?, ?)", [
+			subject.id,
+			conceptName,
+		]);
+		console.log(`Concept added to ${subjectName}: ${conceptName}`);
+	} catch {
+		console.log(`Concept "${conceptName}" already exists in ${subjectName}.`);
+	}
+}
+
+function listConcepts(subjectName?: string) {
+	if (!subjectName) return console.log('Usage: concepts "<subject>"');
+	const subject = getSubject(subjectName);
+	if (!subject) return console.log(`No subject: ${subjectName}`);
+	const rows = db
+		.query("SELECT * FROM concepts WHERE subject_id = ? ORDER BY id")
+		.all(subject.id) as ConceptRow[];
+	if (!rows.length) return console.log("No concepts yet — run plan.");
+	console.log(
+		`Concepts in ${subjectName} (${rows.length})  [🟢 known 🟡 shaky 🔴 blank ⚪ untested]:`,
+	);
+	for (const c of rows) console.log(`  ${statusGlyph(c.status)} ${c.name}`);
+}
+
+function checkStage(stage?: string, name?: string) {
+	if (!stage || !name) return console.log('Usage: advise <stage> "<subject>"');
+	const subject = getSubject(name);
+	if (!subject)
+		return console.log(`NOTE: no subject "${name}" — run: init "${name}"`);
+	const advice = advise(stage, phaseOf(subject), readSignals(subject));
+	if (advice.recommended)
+		console.log(
+			`OK (phase: ${phaseOf(subject)})${advice.note ? ` — TIP: ${advice.note}` : ""}`,
+		);
+	else console.log(`NOTE: ${advice.note}`);
+}
+
+function addCard(
+	subjectName?: string,
+	conceptName?: string,
+	question?: string,
+	answer?: string,
+) {
+	if (!subjectName || !conceptName || !question || !answer)
+		return console.log('Usage: addcard "<subject>" "<concept>" "<q>" "<a>"');
+	const subject = getSubject(subjectName);
+	if (!subject) return console.log(`No subject: ${subjectName}`);
+	const concept = getConcept(subject.id, conceptName);
+	if (!concept)
+		return console.log(
+			`No concept "${conceptName}" in ${subjectName} — add it first: addconcept`,
+		);
+	db.run(
+		"INSERT INTO flashcards (concept_id, subject_id, question, answer, next_review, interval) VALUES (?, ?, ?, ?, ?, 0)",
+		[concept.id, subject.id, question, answer, today()],
+	);
+	console.log(`Card added to ${subjectName} / ${conceptName}.`);
+}
+
+function listDue(name?: string) {
+	const cards = getDueCards(db, name);
+	if (!cards.length)
+		return console.log(`No cards due${name ? ` for ${name}` : ""}.`);
+	console.log(`Due cards (${cards.length}):`);
+	for (const c of cards) console.log(`[${c.id}] ${c.question}`);
+}
+
+function grade(cardId?: string, quality?: string) {
+	const q = Number(quality);
+	if (!cardId || Number.isNaN(q) || q < 0 || q > 5)
+		return console.log("Usage: grade <cardId> <quality 0-5>");
+	const id = Number(cardId);
+	const card = db.query("SELECT * FROM flashcards WHERE id = ?").get(id) as
+		| CardRow
+		| undefined;
+	if (!card)
+		return console.log(`No card with id ${id} — run \`due\` to see valid ids.`);
+	// Soft due-check: an early review barely moves retention (elapsed≈0 ⇒ the
+	// interval won't grow). Surface it, never block — the learner decides.
+	if (card.next_review > today())
+		console.log(
+			`NOTE: card ${id} isn't due until ${card.next_review}; an early review barely moves retention.`,
+		);
+	const updated = gradeCard(db, id, q, grader());
+	// A card review is one exposure surface — advance the concept's clock too, so
+	// reinforcing via cards and via talk feed the same concept-level schedule.
+	recordExposure(db, card.concept_id, "card", q, grader());
+	console.log(
+		`Card ${updated.id} -> next review ${updated.next_review} (interval ${updated.interval}d)`,
+	);
+}
+
+// ---- card & concept management ----------------------------------------------
+
+function showCard(cardId?: string) {
+	if (!cardId) return console.log("Usage: show <cardId>");
+	const card = db
+		.query("SELECT * FROM flashcards WHERE id = ?")
+		.get(Number(cardId)) as CardRow | undefined;
+	if (!card) return console.log(`No card with id ${cardId}.`);
+	console.log(`Card ${card.id}${card.suspended ? "  (suspended)" : ""}`);
+	console.log(`  Q: ${card.question}`);
+	console.log(`  A: ${card.answer}`);
+	console.log(
+		`  interval ${card.interval}d | stability ${card.stability.toFixed(2)} | difficulty ${card.difficulty.toFixed(2)} | reps ${card.repetitions} | next ${card.next_review}${card.last_reviewed ? ` | last ${card.last_reviewed}` : " | never reviewed"}`,
+	);
+}
+
+// Fix a typo without touching scheduling — editing the text shouldn't reset the
+// memory state a learner has built on the card.
+function editCard(cardId?: string, question?: string, answer?: string) {
+	if (!cardId || !question || !answer)
+		return console.log('Usage: editcard <cardId> "<question>" "<answer>"');
+	const id = Number(cardId);
+	if (!db.query("SELECT id FROM flashcards WHERE id = ?").get(id))
+		return console.log(`No card with id ${id}.`);
+	db.run("UPDATE flashcards SET question = ?, answer = ? WHERE id = ?", [
+		question,
+		answer,
+		id,
+	]);
+	console.log(`Card ${id} updated (scheduling unchanged).`);
+}
+
+// Hard-delete a card and its recall history together (FK enforcement requires the
+// child reviews to go first). Deleting your own card isn't gaming — you can't
+// inflate a score by removing evidence — so this is allowed outright.
+function delCard(cardId?: string) {
+	if (!cardId) return console.log("Usage: delcard <cardId>");
+	const id = Number(cardId);
+	if (!db.query("SELECT id FROM flashcards WHERE id = ?").get(id))
+		return console.log(`No card with id ${id}.`);
+	db.transaction(() => {
+		db.run("DELETE FROM reviews WHERE card_id = ?", [id]);
+		db.run("DELETE FROM flashcards WHERE id = ?", [id]);
+	})();
+	console.log(`Card ${id} deleted (with its recall history).`);
+}
+
+// Remove a roadmap leaf — but only when empty. Refuse to silently cascade-delete
+// logged cards/evidence; the learner should delcard those first, deliberately.
+function delConcept(subjectName?: string, conceptName?: string) {
+	if (!subjectName || !conceptName)
+		return console.log('Usage: delconcept "<subject>" "<concept>"');
+	const subject = getSubject(subjectName);
+	if (!subject) return console.log(`No subject: ${subjectName}`);
+	const concept = getConcept(subject.id, conceptName);
+	if (!concept)
+		return console.log(`No concept "${conceptName}" in ${subjectName}.`);
+	const cards = (
+		db
+			.query("SELECT COUNT(*) AS c FROM flashcards WHERE concept_id = ?")
+			.get(concept.id) as { c: number }
+	).c;
+	const ev = (
+		db
+			.query("SELECT COUNT(*) AS c FROM evidence WHERE concept_id = ?")
+			.get(concept.id) as { c: number }
+	).c;
+	if (cards > 0 || ev > 0)
+		return console.log(
+			`"${conceptName}" still has ${cards} card(s) and ${ev} evidence row(s) — remove those first (delcard). Refusing to cascade-delete logged history.`,
+		);
+	db.run("DELETE FROM concepts WHERE id = ?", [concept.id]);
+	console.log(`Concept "${conceptName}" removed from ${subjectName}.`);
+}
+
+// Undo the most recent grade on a card: drop the last reviews row and replay the
+// rest to restore the exact prior FSRS state. The only mutable state in the
+// engine; the recall log stays otherwise append-only.
+function ungrade(cardId?: string) {
+	if (!cardId) return console.log("Usage: ungrade <cardId>");
+	const id = Number(cardId);
+	const last = db
+		.query(
+			"SELECT id, quality, graded_at FROM reviews WHERE card_id = ? ORDER BY id DESC LIMIT 1",
+		)
+		.get(id) as { id: number; quality: number; graded_at: string } | undefined;
+	if (!last) return console.log(`No reviews to undo for card ${id}.`);
+	db.transaction(() => {
+		db.run("DELETE FROM reviews WHERE id = ?", [last.id]);
+		replayCard(db, id);
+	})();
+	const card = db
+		.query("SELECT * FROM flashcards WHERE id = ?")
+		.get(id) as CardRow;
+	console.log(
+		`Undid grade ${last.quality} (${last.graded_at}) on card ${id}. Now: interval ${card.interval}d, next ${card.next_review}.`,
+	);
+}
+
+// Take a card out of (or back into) the due queue without deleting it — for
+// leeches or a card the learner wants to pause.
+function suspendCard(cardId?: string, stateArg?: string) {
+	if (!cardId) return console.log("Usage: suspend <cardId> [on|off]");
+	const id = Number(cardId);
+	if (!db.query("SELECT id FROM flashcards WHERE id = ?").get(id))
+		return console.log(`No card with id ${id}.`);
+	const on = stateArg !== "off";
+	db.run("UPDATE flashcards SET suspended = ? WHERE id = ?", [on ? 1 : 0, id]);
+	console.log(
+		`Card ${id} ${on ? "suspended (out of the due queue)" : "unsuspended (back in rotation)"}.`,
+	);
+}
+
+// ---- exposure (concept-level spaced reinforcement) --------------------------
+
+// Record a reinforcement touch on a concept through a surface. explain/quiz are
+// graded retrieval (quality 0-5); read is recognition (capped, quality optional);
+// card exposures are recorded automatically by `grade`.
+function expose(
+	subjectName?: string,
+	conceptName?: string,
+	surfaceArg?: string,
+	qualityArg?: string,
+) {
+	const surfaces = Object.keys(SURFACES).join("|");
+	if (!subjectName || !conceptName || !surfaceArg || !isSurface(surfaceArg))
+		return console.log(
+			`Usage: expose "<subject>" "<concept>" <${surfaces}> [quality 0-5]`,
+		);
+	const subject = getSubject(subjectName);
+	if (!subject) return console.log(`No subject: ${subjectName}`);
+	const concept = getConcept(subject.id, conceptName);
+	if (!concept)
+		return console.log(
+			`No concept "${conceptName}" in ${subjectName} — add it first: addconcept`,
+		);
+	const surface = surfaceArg as Surface;
+	let q = Number(qualityArg);
+	if (SURFACES[surface].strong && (Number.isNaN(q) || q < 0 || q > 5))
+		return console.log(
+			`${surface} is graded retrieval — Usage: expose "${subjectName}" "${conceptName}" ${surface} <quality 0-5>`,
+		);
+	if (!SURFACES[surface].strong && Number.isNaN(q)) q = 2; // read: recognition
+	const r = recordExposure(db, concept.id, surface, q, grader());
+	console.log(
+		`exposure recorded: ${subjectName} / ${conceptName} via ${surface}. Next exposure ${r.nextExposure} (in ${r.interval}d).`,
+	);
+}
+
+// The reinforcement queue: concepts due to be hit again through ANY surface. The
+// primary "what should I do now" view — cards are just one way to clear it.
+function listDueConcepts(subjectName?: string) {
+	if (subjectName && !getSubject(subjectName))
+		return console.log(`No subject: ${subjectName}`);
+	const due: DueConcept[] = dueConcepts(db, subjectName);
+	if (!due.length)
+		return console.log(
+			`No concepts due for reinforcement${subjectName ? ` in ${subjectName}` : ""}.`,
+		);
+	console.log(`Concepts due for reinforcement (${due.length}):`);
+	for (const d of due)
+		console.log(
+			`  ${statusGlyph(d.status as "known" | "shaky" | "blank" | null)} ${d.name}  (${d.overdue}d overdue)  -> explain / quiz / read / cards`,
+		);
+}
+
+// Manual placement override (probe sets this automatically from a score).
+function setStatus(
+	subjectName?: string,
+	conceptName?: string,
+	statusArg?: string,
+) {
+	const valid = ["blank", "shaky", "known"];
+	if (!subjectName || !conceptName || !statusArg || !valid.includes(statusArg))
+		return console.log(
+			`Usage: mark "<subject>" "<concept>" <${valid.join("|")}>`,
+		);
+	const subject = getSubject(subjectName);
+	if (!subject) return console.log(`No subject: ${subjectName}`);
+	const concept = getConcept(subject.id, conceptName);
+	if (!concept)
+		return console.log(`No concept "${conceptName}" in ${subjectName}.`);
+	db.run("UPDATE concepts SET status = ? WHERE id = ?", [
+		statusArg,
+		concept.id,
+	]);
+	console.log(
+		`${statusGlyph(statusArg as "known" | "shaky" | "blank")} ${subjectName} / ${conceptName} marked ${statusArg}.`,
+	);
+}
+
+// ---- session notes (the conversational stream) ------------------------------
+
+// Capture a short, LLM-authored note at the END of a working session — what was
+// covered, where the learner struggled, what to revisit. resume() surfaces the
+// latest one per subject so the next session (talking, not just cards) resumes
+// with context. Flashcards are one stream; this is the dialogue stream.
+function addNote(subjectName?: string, summary?: string) {
+	if (!subjectName || !summary)
+		return console.log('Usage: note "<subject>" "<session summary>"');
+	const subject = getSubject(subjectName);
+	if (!subject) return console.log(`No subject: ${subjectName}`);
+	db.run(
+		"INSERT INTO sessions (subject_id, summary, grader) VALUES (?, ?, ?)",
+		[subject.id, summary, grader()],
+	);
+	console.log(`Session note saved for ${subjectName}.`);
+}
+
+function listSessions(subjectName?: string) {
+	if (!subjectName) return console.log('Usage: sessions "<subject>"');
+	const subject = getSubject(subjectName);
+	if (!subject) return console.log(`No subject: ${subjectName}`);
+	const rows = db
+		.query(
+			"SELECT at, summary, grader FROM sessions WHERE subject_id = ? ORDER BY id DESC",
+		)
+		.all(subject.id) as { at: string; summary: string; grader: string }[];
+	if (!rows.length)
+		return console.log(`No session notes yet for ${subjectName}.`);
+	console.log(`Session notes for ${subjectName} (newest first):`);
+	for (const r of rows) console.log(`  [${r.at}] ${r.summary}  (${r.grader})`);
+}
+
+// `assessments [subject]` — with a subject, the full task ledger for it (pending
+// + graded, newest first); without, every pending assessment across subjects.
+function listAssessments(subjectName?: string) {
+	const line = (a: AssessmentRow, who?: string) => {
+		const status = a.status === "done" ? `done ${a.score}/100` : "PENDING";
+		return `  [${status}]${who ? ` ${who}` : ""} ${a.kind}  issued ${a.created_at}  ${a.path}`;
+	};
+
+	if (!subjectName) {
+		const pending = pendingAssessments(db);
+		if (!pending.length) return console.log("No pending assessments.");
+		const nameOf = new Map(allSubjects().map((s) => [s.id, s.name]));
+		console.log("Pending assessments (all subjects, oldest first):");
+		for (const a of pending)
+			console.log(line(a, `[${nameOf.get(a.subject_id) ?? "?"}]`));
+		return;
+	}
+
+	const subject = getSubject(subjectName);
+	if (!subject) return console.log(`No subject: ${subjectName}`);
+	const rows = assessmentsForSubject(db, subject.id);
+	if (!rows.length)
+		return console.log(
+			`No assessments yet for ${subjectName}. Issue one:  assess "${subjectName}" [explain|apply|build]`,
+		);
+	console.log(`Assessments for ${subjectName} (newest first):`);
+	for (const a of rows) console.log(line(a));
+}
+
+function latestSession(subjectId: number): string | null {
+	const row = db
+		.query(
+			"SELECT summary FROM sessions WHERE subject_id = ? ORDER BY id DESC LIMIT 1",
+		)
+		.get(subjectId) as { summary: string } | undefined;
+	return row?.summary ?? null;
+}
+
+// ---- dashboard wiring & health ----------------------------------------------
+
+// Emit the full learner state as JSON — the read surface a dashboard (or any
+// external view) consumes. Read-only; the engine still owns the DB.
+function exportJson(subjectName?: string) {
+	const subjects = subjectName
+		? ([getSubject(subjectName)].filter(Boolean) as SubjectRow[])
+		: allSubjects();
+	if (subjectName && !subjects.length)
+		return console.log(`No subject: ${subjectName}`);
+	const out = subjects.map((s) => {
+		const m = assessMastery(masterySignals(s));
+		return {
+			name: s.name,
+			tier: m.tier,
+			tierIndex: m.tierIndex,
+			withinTier: m.withinTier,
+			target: s.target_tier,
+			phase: phaseOf(s),
+			masteredAt: s.mastered_at,
+			blocking: m.blocking,
+			dueCount: dueCount(s.name),
+			conceptsDue: dueConcepts(db, s.name),
+			concepts: db
+				.query(
+					"SELECT id, name, status, interval, last_exposed, next_exposure FROM concepts WHERE subject_id = ? ORDER BY id",
+				)
+				.all(s.id),
+			cards: db
+				.query(
+					"SELECT id, concept_id, question, answer, interval, stability, difficulty, repetitions, next_review, last_reviewed, suspended FROM flashcards WHERE subject_id = ? ORDER BY id",
+				)
+				.all(s.id),
+			evidence: db
+				.query(
+					"SELECT concept_id, kind, bloom, score, passed, at, grader FROM evidence WHERE subject_id = ? ORDER BY id",
+				)
+				.all(s.id),
+			sessions: db
+				.query(
+					"SELECT summary, at, grader FROM sessions WHERE subject_id = ? ORDER BY id DESC",
+				)
+				.all(s.id),
+			pendingAssessments: pendingAssessments(db, s.id),
+		};
+	});
+	console.log(JSON.stringify({ generated: today(), subjects: out }, null, 2));
+}
+
+function doctor() {
+	const count = (sql: string, ...p: unknown[]) =>
+		(db.query(sql).get(...(p as never[])) as { c: number }).c;
+	console.log("--- learn-it doctor ---");
+	console.log(`DB: ${DB_PATH}`);
+	const tables = (
+		db.query("SELECT name FROM sqlite_master WHERE type = 'table'").all() as {
+			name: string;
+		}[]
+	).map((t) => t.name);
+	for (const t of [
+		"subjects",
+		"concepts",
+		"flashcards",
+		"reviews",
+		"evidence",
+		"sessions",
+		"assessments",
+	])
+		console.log(
+			`  table ${t}: ${tables.includes(t) ? "ok" : "MISSING — run bun src/init-db.ts"}`,
+		);
+	const fk = (db.query("PRAGMA foreign_keys").get() as { foreign_keys: number })
+		.foreign_keys;
+	console.log(`  foreign_keys: ${fk ? "on" : "OFF"}`);
+	console.log(
+		`  grader env: ${process.env.LEARN_IT_GRADER?.trim() || "unset (scores log as 'unpinned')"}`,
+	);
+	console.log(
+		`  counts: subjects ${count("SELECT COUNT(*) AS c FROM subjects")}, concepts ${count("SELECT COUNT(*) AS c FROM concepts")}, cards ${count("SELECT COUNT(*) AS c FROM flashcards")}, reviews ${count("SELECT COUNT(*) AS c FROM reviews")}, evidence ${count("SELECT COUNT(*) AS c FROM evidence")}`,
+	);
+	const unpinned = count(
+		"SELECT COUNT(*) AS c FROM evidence WHERE grader IS NULL OR grader = 'unpinned'",
+	);
+	if (unpinned)
+		console.log(`  ⚠ ${unpinned} evidence score(s) have no recorded grader.`);
+	const orphan = count(
+		"SELECT COUNT(*) AS c FROM flashcards f LEFT JOIN concepts c ON f.concept_id = c.id WHERE c.id IS NULL",
+	);
+	if (orphan) console.log(`  ⚠ ${orphan} card(s) reference a missing concept.`);
+	const suspended = count(
+		"SELECT COUNT(*) AS c FROM flashcards WHERE COALESCE(suspended, 0) = 1",
+	);
+	if (suspended) console.log(`  ${suspended} card(s) suspended.`);
+	const noFm = allSubjects()
+		.flatMap((s) => learnerMarkdown(s.name))
+		.filter((f) => !hasFrontmatter(fs.readFileSync(f, "utf8")));
+	if (noFm.length)
+		console.log(
+			`  ⚠ ${noFm.length} learner markdown file(s) missing frontmatter — run: fmt`,
+		);
+
+	// --- integrity / drift checks (guard the invariants nothing else verifies) ---
+	const issues: string[] = [];
+
+	// (a) Engine templates must exist — auditTemplate/assess degrade silently if not.
+	for (const t of [
+		"templates/audit.md",
+		"templates/assessment/explain.md",
+		"templates/assessment/apply.md",
+		"templates/assessment/build.md",
+		"templates/rubric/explain.md",
+		"templates/rubric/apply.md",
+		"templates/rubric/build.md",
+	])
+		if (!fs.existsSync(t)) issues.push(`missing template: ${t}`);
+
+	// (b) subjects/ dir ↔ db rows. An orphan dir = data the engine ignores; a
+	//     row with no dir = lost files.
+	const dbNames = new Set(allSubjects().map((s) => s.name));
+	const root = path.join(".", "subjects");
+	const diskNames = fs.existsSync(root)
+		? fs
+				.readdirSync(root, { withFileTypes: true })
+				.filter((d) => d.isDirectory())
+				.map((d) => d.name)
+		: [];
+	for (const n of diskNames)
+		if (!dbNames.has(n)) issues.push(`subjects/${n}/ has no db row (orphaned)`);
+	for (const n of dbNames)
+		if (!diskNames.includes(n))
+			issues.push(`subject "${n}" has no subjects/ dir`);
+
+	// (c) roadmap.md ↔ registered concepts. Reliable direction: a registered
+	//     concept whose name never appears in the written roadmap (the reverse —
+	//     a roadmap bullet not registered — isn't parseable from freeform md).
+	for (const s of allSubjects()) {
+		const concepts = (
+			db.query("SELECT name FROM concepts WHERE subject_id = ?").all(s.id) as {
+				name: string;
+			}[]
+		).map((c) => c.name);
+		if (!concepts.length) continue;
+		const rm = path.join(subjectDir(s.name), "roadmap.md");
+		if (!fs.existsSync(rm)) {
+			issues.push(
+				`${s.name}: ${concepts.length} concept(s) registered but no roadmap.md`,
+			);
+			continue;
+		}
+		const text = fs.readFileSync(rm, "utf8");
+		const absent = concepts.filter((c) => !text.includes(c));
+		if (absent.length)
+			issues.push(
+				`${s.name}: concept(s) not in roadmap.md → ${absent.join(", ")}`,
+			);
+	}
+
+	// (d) assessment files ↔ assessments table.
+	const tracked = new Set(
+		(db.query("SELECT path FROM assessments").all() as { path: string }[]).map(
+			(r) => r.path,
+		),
+	);
+	for (const p of tracked)
+		if (!fs.existsSync(p)) issues.push(`tracked assessment file missing: ${p}`);
+	for (const s of allSubjects()) {
+		const adir = path.join(subjectDir(s.name), "assessments");
+		if (!fs.existsSync(adir)) continue;
+		for (const f of fs.readdirSync(adir))
+			if (f.endsWith(".md") && !tracked.has(path.join(adir, f)))
+				issues.push(
+					`untracked assessment file (no db row): ${path.join(adir, f)}`,
+				);
+	}
+
+	for (const i of issues) console.log(`  ⚠ ${i}`);
+	console.log(
+		`  integrity: ${issues.length ? `${issues.length} issue(s)` : "clean"}`,
+	);
+	console.log("done.");
+}
+
+// The learner markdown under a subject that should carry frontmatter.
+function learnerMarkdown(name: string): string[] {
+	const dir = subjectDir(name);
+	const files = ["audit.md", "roadmap.md", "notes.md"]
+		.map((f) => path.join(dir, f))
+		.filter((p) => fs.existsSync(p));
+	const adir = path.join(dir, "assessments");
+	if (fs.existsSync(adir))
+		for (const f of fs.readdirSync(adir))
+			if (f.endsWith(".md")) files.push(path.join(adir, f));
+	return files;
+}
+
+// Frontmatter `type` for a learner file, inferred from its name / location.
+function frontmatterType(file: string): string {
+	const base = path.basename(file);
+	if (base === "audit.md") return "audit";
+	if (base === "roadmap.md") return "roadmap";
+	if (base === "notes.md") return "notes";
+	if (file.includes(`${path.sep}assessments${path.sep}`)) return "assessment";
+	return "doc";
+}
+
+// `fmt [subject]` — backfill frontmatter on learner markdown hand-written without
+// it (the "silently add when missing" pass). Idempotent: only rewrites a file
+// that was actually missing a header, so it's safe to run any time.
+function fmt(subjectName?: string) {
+	const subjects = subjectName
+		? ([getSubject(subjectName)].filter(Boolean) as SubjectRow[])
+		: allSubjects();
+	if (subjectName && !subjects.length)
+		return console.log(`No subject: ${subjectName}`);
+
+	let fixed = 0;
+	for (const s of subjects)
+		for (const file of learnerMarkdown(s.name)) {
+			const text = fs.readFileSync(file, "utf8");
+			if (hasFrontmatter(text)) continue;
+			const type = frontmatterType(file);
+			fs.writeFileSync(
+				file,
+				ensureFrontmatter(text, { type, subject: s.name }),
+			);
+			console.log(`  + frontmatter (${type}): ${file}`);
+			fixed++;
+		}
+	console.log(
+		fixed
+			? `Stamped ${fixed} file(s).`
+			: "All learner markdown already has frontmatter.",
+	);
+}
+
+// Issue a home assessment: copy the right template into the subject's
+// assessments folder, fill the slots, and hand the agent the focus inputs. The
+// structure is fixed by the template; only the question content is the agent's.
+function assess(subjectName?: string, kindArg?: string) {
+	if (!subjectName)
+		return console.log('Usage: assess "<subject>" [explain|apply|build]');
+	const subject = getSubject(subjectName);
+	if (!subject) return console.log(`No subject: ${subjectName}`);
+
+	const phase = phaseOf(subject);
+	const kind = (
+		kindArg && kindArg in EVIDENCE_BLOOM ? kindArg : PHASE_KIND[phase]
+	) as EvidenceKind;
+
+	const tmplPath = path.join(".", "templates", "assessment", `${kind}.md`);
+	if (!fs.existsSync(tmplPath))
+		return console.log(`Missing template: ${tmplPath}`);
+
+	const m = assessMastery(masterySignals(subject));
+	// Weakest first: highest FSRS difficulty (the cards fighting back hardest).
+	const due = [...getDueCards(db, subjectName)].sort(
+		(a, b) => b.difficulty - a.difficulty,
+	);
+	const weakest = due.slice(0, 5).map((c) => c.question);
+	const focus = [
+		weakest.length ? `Weakest cards: ${weakest.join("; ")}` : "",
+		m.blocking.length ? `Next tier needs: ${m.blocking[0]}` : "",
+	]
+		.filter(Boolean)
+		.join("\n");
+
+	const filled = fs
+		.readFileSync(tmplPath, "utf8")
+		.replaceAll("{{subject}}", subjectName)
+		.replaceAll("{{date}}", today())
+		.replaceAll(
+			"{{focus}}",
+			focus || "(mentor: pick the highest-leverage gap)",
+		);
+
+	const dir = path.join(subjectDir(subjectName), "assessments");
+	if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+	let out = path.join(dir, `${today()}-${kind}.md`);
+	let n = 2;
+	while (fs.existsSync(out))
+		out = path.join(dir, `${today()}-${kind}-${n++}.md`);
+	fs.writeFileSync(out, filled);
+
+	// Track it as pending so it nags on the dashboard until `evaluate` grades it.
+	recordAssessment(db, subject.id, kind, out);
+
+	console.log(`Assessment issued (${kind}, phase ${phase}): ${out}`);
+	console.log(
+		`Fill in the Task, have the learner submit, then: evaluate "${subjectName}" ${kind} <score> "${out}"`,
+	);
+	if (focus) console.log(`Focus:\n${focus}`);
+}
+
+// Grade a submitted assessment against its rubric and log the evidence. The
+// agent does the scoring (per the rubric template); this records it.
+function evaluate(
+	subjectName?: string,
+	kindArg?: string,
+	scoreArg?: string,
+	file?: string,
+) {
+	const score = Number(scoreArg);
+	if (
+		!subjectName ||
+		!kindArg ||
+		!(kindArg in EVIDENCE_BLOOM) ||
+		Number.isNaN(score) ||
+		score < 0 ||
+		score > 100
+	)
+		return console.log(
+			'Usage: evaluate "<subject>" <explain|apply|build> <score 0-100> [file]',
+		);
+	const subject = getSubject(subjectName);
+	if (!subject) return console.log(`No subject: ${subjectName}`);
+
+	const kind = kindArg as EvidenceKind;
+	const passed = score >= PASS ? 1 : 0;
+	db.run(
+		"INSERT INTO evidence (subject_id, concept_id, kind, bloom, score, passed, source_file, grader) VALUES (?, NULL, ?, ?, ?, ?, ?, ?)",
+		[
+			subject.id,
+			kind,
+			EVIDENCE_BLOOM[kind],
+			score,
+			passed,
+			file ?? null,
+			grader(),
+		],
+	);
+
+	// If this grades a tracked assessment (file path given), close it out and
+	// stamp the result into the file so the task is self-contained.
+	if (file && completeAssessment(db, subject.id, score, today(), file)) {
+		if (fs.existsSync(file))
+			fs.appendFileSync(
+				file,
+				`\n**Recorded:** ${score}/100 — ${passed ? "pass" : "fail"} (${today()}, ${grader()}).\n`,
+			);
+		console.log(`Assessment closed: ${file}`);
+	}
+
+	stampMasteredIfExpert(subject);
+	console.log(
+		`${kind} evidence recorded for ${subjectName}: ${score}/100 (${passed ? "pass" : "fail"}). Tier: ${tierLabel(getSubject(subjectName) as SubjectRow)}`,
+	);
+}
+
+// Diagnostic probe (explore-gaps): the agent tests the learner on ONE concept
+// and records concept-level evidence. This is how a placement diagnostic moves
+// a newcomer to their real level — up to proficient (expert needs durability
+// over time, which a single session can't provide).
+function probe(
+	subjectName?: string,
+	conceptName?: string,
+	kindArg?: string,
+	scoreArg?: string,
+) {
+	const score = Number(scoreArg);
+	if (
+		!subjectName ||
+		!conceptName ||
+		(kindArg !== "explain" && kindArg !== "apply") ||
+		Number.isNaN(score) ||
+		score < 0 ||
+		score > 100
+	)
+		return console.log(
+			'Usage: probe "<subject>" "<concept>" <explain|apply> <score 0-100>',
+		);
+	const subject = getSubject(subjectName);
+	if (!subject) return console.log(`No subject: ${subjectName}`);
+	const concept = getConcept(subject.id, conceptName);
+	if (!concept)
+		return console.log(
+			`No concept "${conceptName}" in ${subjectName} — add it first: addconcept`,
+		);
+
+	const kind = kindArg as EvidenceKind;
+	const passed = score >= PASS ? 1 : 0;
+	db.run(
+		"INSERT INTO evidence (subject_id, concept_id, kind, bloom, score, passed, grader) VALUES (?, ?, ?, ?, ?, ?, ?)",
+		[
+			subject.id,
+			concept.id,
+			kind,
+			EVIDENCE_BLOOM[kind],
+			score,
+			passed,
+			grader(),
+		],
+	);
+	// A probe places the concept (blank/shaky/known) AND is its first exposure —
+	// seeding the concept's spaced-reinforcement clock from the diagnostic.
+	const status = statusFromScore(score);
+	db.run("UPDATE concepts SET status = ? WHERE id = ?", [status, concept.id]);
+	recordExposure(
+		db,
+		concept.id,
+		kind === "explain" ? "explain" : "quiz",
+		scoreToQuality(score),
+		grader(),
+	);
+	console.log(
+		`${statusGlyph(status)} probe recorded: ${subjectName} / ${conceptName} ${kind} ${score}/100 (${status}). Tier: ${tierLabel(getSubject(subjectName) as SubjectRow)}`,
+	);
+}
+
+// Set the tier the learner is aiming for, so the watcher focuses on the gap
+// between where they are and where they want to be (e.g. an upskiller).
+function setTarget(subjectName?: string, tierArg?: string) {
+	if (!subjectName || !tierArg || tierIndexOf(tierArg) < 0)
+		return console.log(`Usage: target "<subject>" <${DREYFUS.join("|")}>`);
+	const subject = getSubject(subjectName);
+	if (!subject) return console.log(`No subject: ${subjectName}`);
+	db.run("UPDATE subjects SET target_tier = ? WHERE id = ?", [
+		tierArg,
+		subject.id,
+	]);
+	console.log(`${subjectName} target set: ${tierArg}.`);
+}
+
+function stampMasteredIfExpert(subject: SubjectRow) {
+	const after = assessMastery(masterySignals(subject));
+	if (after.tier === "expert" && !subject.mastered_at)
+		db.run("UPDATE subjects SET mastered_at = ? WHERE id = ?", [
+			today(),
+			subject.id,
+		]);
+}
+
+function mastery(name?: string) {
+	if (!name) return console.log('Usage: mastery "<subject>"');
+	const subject = getSubject(name);
+	if (!subject) return console.log(`No subject: ${name}`);
+	const s = masterySignals(subject);
+	const m = assessMastery(s);
+
+	const target = subject.target_tier;
+	const reachedTarget = target != null && m.tierIndex >= tierIndexOf(target);
+
+	console.log(`\n--- mastery: ${name} ---`);
+	console.log(
+		m.tier === "expert"
+			? "Tier: expert ★ (maxed — rare; respect)"
+			: `Tier: ${m.tier}  (${m.withinTier}% toward ${nextTierName(m.tier)})`,
+	);
+	if (target)
+		console.log(
+			`Target: ${target}  ${reachedTarget ? "✓ reached — maintenance from here" : "(keep climbing)"}`,
+		);
+	console.log(
+		`Concepts: ${s.coveredConcepts}/${s.concepts} covered | proven: ${s.provenConcepts} | retained ${LONG_RETENTION_DAYS}d+: ${s.longRetainedConcepts}`,
+	);
+	console.log(
+		`Evidence: apply ${s.bestApply}/100${s.applyPassed ? " ✓" : ""} | explain ${s.explainPassed ? "✓" : "—"} | build ${s.buildPassed ? "✓" : "—"}`,
+	);
+	// Provenance audit: scores whose grader wasn't recorded are the soft spot in
+	// "un-gameable" — surface them so they can be re-graded by a pinned model.
+	const unpinned = (
+		db
+			.query(
+				"SELECT COUNT(*) AS c FROM evidence WHERE subject_id = ? AND (grader IS NULL OR grader = 'unpinned')",
+			)
+			.get(subject.id) as { c: number }
+	).c;
+	if (unpinned > 0)
+		console.log(
+			`⚠ ${unpinned} evidence score(s) have no recorded grader — set LEARN_IT_GRADER so mastery stays auditable.`,
+		);
+	if (m.blocking.length) {
+		console.log("To level up:");
+		for (const b of m.blocking) console.log(`  - ${b}`);
+	}
+}
+
+function nextTierName(tier: string): string {
+	const order = [
+		"novice",
+		"advanced-beginner",
+		"competent",
+		"proficient",
+		"expert",
+	];
+	return order[order.indexOf(tier) + 1] ?? "expert";
+}
+
+// The command menu — printed by `resume` so the entry point is self-documenting,
+// makefile-style (cf. career-ops discovery). These are the /learn-it WORKFLOW
+// stages, not raw CLI subcommands: explore-topic / concept / reinforce / feynman
+// / exam are skill prompts the router reads, so they're shown in the /learn-it
+// form the learner actually types. One source of truth, so it can't drift.
+function printMenu() {
+	console.log(`
+Commands  (run as: /learn-it <command>):
+
+  Start / diagnose
+    init "<subject>"   start a subject
+    explore-topic      map the territory into concepts
+    explore-gaps       probe to place you at your real level
+    plan               lock + order the roadmap
+
+  Build & keep alive
+    concept <term>     learn one concept (analogy + mechanism)
+    reinforce [subj]   spaced, varied re-exposure of due concepts  (daily loop)
+    quiz / review      retrieval surfaces (one question / flashcards)
+
+  Prove
+    feynman <subj>     teach it back, graded
+    assess <subj>      home assessment task, then evaluate
+    exam <subj>        hard scored test on a new problem
+    mastery <subj>     tier, % to next, what's blocking
+
+  Inspect
+    db [table]         browse raw db, read-only  (db "SELECT ..." for queries)`);
+}
+
+// Read-only DB inspector (`db`). Opens its OWN readonly connection, so browsing
+// raw state can never write — mastery stays un-gameable even through this
+// surface. No arg = tables + row counts; a bare table name = dump it (capped);
+// anything else runs as a read-only query (SELECT / WITH / PRAGMA / EXPLAIN).
+function inspectDb(arg?: string) {
+	const DB_DUMP_LIMIT = 100;
+	const q = arg?.trim();
+	const ro = new Database(DB_PATH, { readonly: true });
+	try {
+		if (!q) {
+			const tables = ro
+				.query(
+					"SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
+				)
+				.all() as { name: string }[];
+			console.log(`Tables in ${DB_PATH}:`);
+			for (const t of tables) {
+				const n = (
+					ro.query(`SELECT COUNT(*) AS c FROM "${t.name}"`).get() as {
+						c: number;
+					}
+				).c;
+				console.log(`  ${t.name}  (${n} row${n === 1 ? "" : "s"})`);
+			}
+			console.log(
+				'\n  db <table>          dump a table\n  db "SELECT ..."     run a read-only query',
+			);
+			return;
+		}
+		const isIdent = /^[A-Za-z_]\w*$/.test(q);
+		if (!isIdent && !/^(SELECT|WITH|PRAGMA|EXPLAIN)\b/i.test(q))
+			return console.log(
+				"Read-only inspector — only SELECT / WITH / PRAGMA / EXPLAIN are allowed.",
+			);
+		const sql = isIdent ? `SELECT * FROM "${q}" LIMIT ${DB_DUMP_LIMIT}` : q;
+		let rows: Record<string, unknown>[];
+		try {
+			rows = ro.query(sql).all() as Record<string, unknown>[];
+		} catch (e) {
+			return console.log(`Query failed: ${(e as Error).message}`);
+		}
+		if (!rows.length) return console.log("(no rows)");
+		console.table(rows);
+		if (isIdent && rows.length === DB_DUMP_LIMIT)
+			console.log(
+				`(showing first ${DB_DUMP_LIMIT} — refine with: db "SELECT ... LIMIT N")`,
+			);
+	} finally {
+		ro.close();
+	}
+}
+
+function resume() {
+	const subjects = allSubjects();
+	const pending = pendingAssessments(db);
+	console.log("\n--- learn-it ---");
+	console.log(
+		`Concepts to reinforce: ${dueConcepts(db).length}  |  cards due: ${dueCount()}  |  assessments pending: ${pending.length}  (all subjects)`,
+	);
+
+	if (!subjects.length) {
+		console.log("No subjects yet — start with the first command below.");
+		printMenu();
+		return;
+	}
+
+	console.log("\nSubjects:");
+	for (const s of subjects) {
+		const phase = phaseOf(s);
+		const cDue = dueConcepts(db, s.name).length;
+		const cardsDue = dueCount(s.name);
+		const pDue = pending.filter((p) => p.subject_id === s.id).length;
+		const next =
+			phase === "mastered" ? "done" : `next: ${PHASE_SUGGESTION[phase]}`;
+		const load = [
+			cDue > 0 ? `${cDue} concept${cDue > 1 ? "s" : ""} to reinforce` : "",
+			cardsDue > 0 ? `${cardsDue} cards due` : "",
+			pDue > 0 ? `${pDue} assessment${pDue > 1 ? "s" : ""} pending` : "",
+		]
+			.filter(Boolean)
+			.join(", ");
+		console.log(`  [${tierLabel(s)}] ${s.name}  (${load || "—"})  -> ${next}`);
+		// Carry context across sessions: the last thing the mentor noted.
+		const note = latestSession(s.id);
+		if (note) console.log(`        last session: ${note}`);
+	}
+
+	// Pending assessments nag here until graded — issued, awaiting the learner's
+	// answer + an `evaluate`. The oldest is the most overdue.
+	if (pending.length) {
+		const nameOf = new Map(subjects.map((s) => [s.id, s.name]));
+		console.log("\nPending assessments:");
+		for (const a of pending)
+			console.log(
+				`  [${nameOf.get(a.subject_id) ?? "?"}] ${a.kind}  issued ${a.created_at}  ${a.path}`,
+			);
+		console.log("Grade one:  /learn-it evaluate, or open the file to answer.");
+	}
+
+	if (dueCount() > 0) console.log("\nReview everything due:  /learn-it review");
+	printMenu();
+}
+
+// ---- router -----------------------------------------------------------------
+
+function main() {
+	switch (command) {
+		case undefined:
+		case "resume":
+		case "status":
+			return resume();
+		case "init":
+			return initSubject(args[0]);
+		case "addconcept":
+			return addConcept(args[0], args[1]);
+		case "concepts":
+			return listConcepts(args[0]);
+		case "advise":
+			return checkStage(args[0], args[1]);
+		case "addcard":
+			return addCard(args[0], args[1], args[2], args[3]);
+		case "show":
+			return showCard(args[0]);
+		case "editcard":
+			return editCard(args[0], args[1], args[2]);
+		case "delcard":
+			return delCard(args[0]);
+		case "delconcept":
+			return delConcept(args[0], args[1]);
+		case "ungrade":
+			return ungrade(args[0]);
+		case "suspend":
+			return suspendCard(args[0], args[1]);
+		case "probe":
+			return probe(args[0], args[1], args[2], args[3]);
+		case "target":
+			return setTarget(args[0], args[1]);
+		case "due":
+			return listDue(args[0]);
+		case "due-concepts":
+		case "reinforce":
+			return listDueConcepts(args[0]);
+		case "expose":
+			return expose(args[0], args[1], args[2], args[3]);
+		case "mark":
+			return setStatus(args[0], args[1], args[2]);
+		case "grade":
+			return grade(args[0], args[1]);
+		case "note":
+			return addNote(args[0], args[1]);
+		case "sessions":
+			return listSessions(args[0]);
+		case "assess":
+			return assess(args[0], args[1]);
+		case "assessments":
+			return listAssessments(args[0]);
+		case "evaluate":
+			return evaluate(args[0], args[1], args[2], args[3]);
+		case "mastery":
+			return mastery(args[0]);
+		case "export":
+			return exportJson(args[0]);
+		case "fmt":
+			return fmt(args[0]);
+		case "doctor":
+			return doctor();
+		case "db":
+			return inspectDb(args.join(" ") || undefined);
+		default:
+			console.log(
+				"Usage: bun src/learn-it.ts <command>\n" +
+					"  state:    resume | mastery <s> | export [s] | doctor | fmt [s] | db [table]\n" +
+					"  subject:  init <s> | target <s> <tier> | concepts <s> | advise <stage> <s>\n" +
+					"  concept:  addconcept <s> <c> | delconcept <s> <c> | mark <s> <c> <blank|shaky|known>\n" +
+					"  reinforce: due-concepts [s] | expose <s> <c> <explain|quiz|read|card> [0-5]\n" +
+					"  cards:    addcard <s> <c> <q> <a> | show <id> | editcard <id> <q> <a> | delcard <id> | suspend <id> [on|off]\n" +
+					"  review:   due [s] | grade <id> <0-5> | ungrade <id>\n" +
+					"  assess:   probe <s> <c> <explain|apply> <0-100> | assess <s> [kind] | evaluate <s> <kind> <0-100> [file] | assessments [s]\n" +
+					"  session:  note <s> <summary> | sessions <s>",
+			);
+	}
+}
+
+main();

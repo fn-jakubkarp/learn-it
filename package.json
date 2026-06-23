@@ -1,0 +1,46 @@
+{
+	"name": "learn-it",
+	"version": "0.1.0",
+	"description": "An AI learning pipeline that builds knowledge that lasts — spaced repetition (FSRS), active recall, Feynman, Bloom depth, and a Dreyfus mastery score you can't fake.",
+	"type": "module",
+	"license": "MIT",
+	"author": "Jakub Karp <lirinlabs@gmail.com>",
+	"homepage": "https://github.com/fn-jakubkarp/learn-it#readme",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/fn-jakubkarp/learn-it.git"
+	},
+	"bugs": {
+		"url": "https://github.com/fn-jakubkarp/learn-it/issues"
+	},
+	"keywords": [
+		"learning",
+		"spaced-repetition",
+		"fsrs",
+		"active-recall",
+		"flashcards",
+		"feynman",
+		"mastery",
+		"bun",
+		"sqlite",
+		"ai"
+	],
+	"private": true,
+	"scripts": {
+		"db:init": "bun src/init-db.ts",
+		"dashboard": "bun src/dashboard.ts",
+		"test": "bun test",
+		"check": "biome check",
+		"check:fix": "biome check --write",
+		"format": "biome format --write",
+		"typecheck": "tsc --noEmit",
+		"verify": "biome check && tsc --noEmit && bun test"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^2.5.0",
+		"@types/bun": "latest"
+	},
+	"peerDependencies": {
+		"typescript": "^5"
+	}
+}
