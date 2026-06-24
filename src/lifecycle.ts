@@ -25,8 +25,12 @@ export type Phase = (typeof PHASES)[number];
 
 // What the learner has actually produced for a topic. The phase is derived
 // from this, so it can never desync from reality.
+//
+// NOTE: diagnose is left behind by DEMONSTRATION, never by a hand-typed audit.
+// The old `auditFilled` gate trusted self-report (the one thing this tool exists
+// to distrust); phase now turns on a built roadmap + at least one PROBED concept
+// (`diagnosedConcepts`). The audit is a generated readout, not an entry form.
 export interface TopicSignals {
-	auditFilled: boolean;
 	hasRoadmap: boolean;
 	cardCount: number;
 	reviewedCount: number; // cards recalled at least once
@@ -69,11 +73,12 @@ export function phaseIndex(p: string): number {
 // Read a topic's phase off its real state. No setter exists by design.
 export function inferPhase(s: TopicSignals): Phase {
 	if (s.mastered) return "mastered";
-	if (!s.auditFilled) return "diagnose";
-	if (!s.hasRoadmap) return "diagnose"; // audit done, plan is the next move
+	if (!s.hasRoadmap) return "diagnose"; // no map yet — explore-topic
 	// Demonstrated application (e.g. an upskiller placed by the diagnostic) is a
-	// verify-level signal regardless of how many cards exist.
+	// verify-level signal regardless of how many cards exist — and it already
+	// proves diagnosis happened, so it short-circuits the probe gate below.
 	if (s.hasAppliedEvidence) return "verify";
+	if (s.diagnosedConcepts === 0) return "diagnose"; // map built, nothing probed — explore-gaps
 	if (s.cardCount === 0) return "conceptualize"; // building understanding, no cards yet
 	if (s.reviewedCount === 0) return "recall"; // cards exist, start retrieving
 	if (s.maturedCount < s.cardCount) return "space"; // some still settling
@@ -92,10 +97,10 @@ export function advise(stage: string, phase: Phase, s: TopicSignals): Advice {
 
 	switch (stage) {
 		case "plan":
-			if (!s.auditFilled)
+			if (s.diagnosedConcepts === 0)
 				return {
 					recommended: false,
-					note: "audit is empty — the roadmap will be generic. Fill the topic's audit.md first for a tailored plan.",
+					note: "nothing probed yet — the roadmap will be generic. Run explore-gaps first so plan can reconcile against real placements.",
 				};
 			return ok;
 		case "concept": {

@@ -25,25 +25,6 @@ export function ensureFrontmatter(
 	return `${FENCE}\n${block}\n${FENCE}\n\n${text.replace(/^\n+/, "")}`;
 }
 
-// Markers wrapping the AI-generated "areas this touches" primer in an audit.
-// The primer is a memory-jog the agent writes to nudge the learner; it must NOT
-// count as the learner having filled the audit, so the emptiness check strips
-// this block (just like it strips frontmatter) before comparing against the
-// pristine scaffold.
-const PRIMER_START = "<!-- PRIMER:START -->";
-const PRIMER_END = "<!-- PRIMER:END -->";
-
-// Remove the primer block (markers inclusive). No markers (or an unterminated
-// one) => text unchanged, so this is safe on legacy audits and any non-audit
-// markdown.
-export function stripPrimer(text: string): string {
-	const start = text.indexOf(PRIMER_START);
-	if (start < 0) return text;
-	const end = text.indexOf(PRIMER_END, start);
-	if (end < 0) return text; // unterminated — leave as-is
-	return text.slice(0, start) + text.slice(end + PRIMER_END.length);
-}
-
 // The content after the frontmatter block (or the whole text if there is none).
 // Used to judge a scaffolded file "empty" by its body, ignoring the header.
 export function stripFrontmatter(text: string): string {

@@ -7,6 +7,22 @@ import path from "node:path";
 const DEFAULT_DATA_DIR = path.join(import.meta.dir, "..", "data");
 export const DB_PATH = path.join(DEFAULT_DATA_DIR, "learn_it.db");
 
+// A short, ascii, filesystem-safe identifier for a subject — distinct from its
+// human display name. The original design used the name as the directory, SQL
+// key, AND CLI argument; a real subject like "egzamin krótkofalowca klasa 1"
+// (spaces + diacritics) made paths fragile and the arg tedious to type. The slug
+// is what you type and what names the folder; the name is what you read.
+// Diacritics fold to ascii (ó→o), everything non-alnum collapses to a hyphen.
+export function slugify(input: string): string {
+	const slug = input
+		.normalize("NFKD")
+		.replace(/[̀-ͯ]/g, "") // strip combining diacritical marks
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, "-") // any run of non-alnum → single hyphen
+		.replace(/^-+|-+$/g, ""); // trim leading/trailing hyphens
+	return slug || "subject"; // all-symbol names degrade to a usable default
+}
+
 // Create the schema and forward-migrate an existing db. Idempotent — every
 // statement is `CREATE TABLE IF NOT EXISTS` or a guarded `ALTER`, so calling it
 // on an up-to-date db is a no-op. Safe to invoke from the CLI's first-run path
@@ -230,6 +246,39 @@ export function initDb(dataDir: string = DEFAULT_DATA_DIR): string {
 	// not hide.
 	ensureColumn("evidence", "grader", "TEXT DEFAULT 'unpinned'");
 	ensureColumn("reviews", "grader", "TEXT DEFAULT 'unpinned'");
+
+	// SUBJECT SLUG: the ascii, filesystem-safe identifier (see slugify above),
+	// added after name-as-everything proved fragile for real subjects. Backfill any
+	// pre-slug row from its name, de-duplicated, then enforce uniqueness with an
+	// index (ALTER can't add a UNIQUE column with a computed default). The on-disk
+	// directory rename (subjects/<name> → subjects/<slug>) happens lazily in the
+	// CLI, where the working directory is correct — not here.
+	ensureColumn("subjects", "slug", "TEXT");
+	const unslugged = db
+		.query("SELECT id, name FROM subjects WHERE slug IS NULL OR slug = ''")
+		.all() as { id: number; name: string }[];
+	if (unslugged.length) {
+		const used = new Set(
+			(
+				db
+					.query(
+						"SELECT slug FROM subjects WHERE slug IS NOT NULL AND slug != ''",
+					)
+					.all() as { slug: string }[]
+			).map((r) => r.slug),
+		);
+		for (const row of unslugged) {
+			const base = slugify(row.name);
+			let slug = base;
+			let n = 2;
+			while (used.has(slug)) slug = `${base}-${n++}`;
+			used.add(slug);
+			db.run("UPDATE subjects SET slug = ? WHERE id = ?", [slug, row.id]);
+		}
+	}
+	db.run(
+		"CREATE UNIQUE INDEX IF NOT EXISTS idx_subjects_slug ON subjects(slug)",
+	);
 
 	db.close();
 	return dbPath;

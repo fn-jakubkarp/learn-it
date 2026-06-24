@@ -3,7 +3,6 @@ import {
 	ensureFrontmatter,
 	hasFrontmatter,
 	stripFrontmatter,
-	stripPrimer,
 } from "../src/frontmatter";
 
 describe("frontmatter helpers", () => {
@@ -46,43 +45,8 @@ describe("frontmatter helpers", () => {
 	});
 
 	test("round-trip: a stamped file's body still compares equal to the original", () => {
-		const body = "# Audit: x\n\n## Know\n- ";
+		const body = "# x\n\n## Goal\n- ";
 		const stamped = ensureFrontmatter(body, { type: "audit", subject: "x" });
 		expect(stripFrontmatter(stamped)).toBe(body);
-	});
-});
-
-describe("stripPrimer — the AI nudge must not count as a filled audit", () => {
-	test("removes the primer block, markers inclusive", () => {
-		const text =
-			"## Know\n- \n\n## Areas\n<!-- PRIMER:START -->\n- ownership\n- borrowing\n<!-- PRIMER:END -->\n";
-		expect(stripPrimer(text)).toBe("## Know\n- \n\n## Areas\n\n");
-	});
-
-	test("no markers => unchanged (legacy audits, other markdown)", () => {
-		const text = "## Know\n- something\n";
-		expect(stripPrimer(text)).toBe(text);
-	});
-
-	test("unterminated marker => unchanged (don't eat the rest of the file)", () => {
-		const text = "## Know\n- mine\n<!-- PRIMER:START -->\n- a\n";
-		expect(stripPrimer(text)).toBe(text);
-	});
-
-	test("a pristine audit with the primer FILLED still strips equal to the blank scaffold", () => {
-		// The core invariant: an init-seeded primer alone leaves the audit "empty".
-		const blank =
-			"# Audit: x\n\n## Know\n- \n\n## Areas\n<!-- PRIMER:START -->\n<!-- PRIMER:END -->\n";
-		const seeded =
-			"# Audit: x\n\n## Know\n- \n\n## Areas\n<!-- PRIMER:START -->\n- ownership\n- lifetimes\n<!-- PRIMER:END -->\n";
-		expect(stripPrimer(seeded).trim()).toBe(stripPrimer(blank).trim());
-	});
-
-	test("learner's own words survive the strip => audit reads as filled", () => {
-		const blank =
-			"# Audit: x\n\n## Know\n- \n\n<!-- PRIMER:START -->\n<!-- PRIMER:END -->\n";
-		const filled =
-			"# Audit: x\n\n## Know\n- i know structs\n\n<!-- PRIMER:START -->\n- ownership\n<!-- PRIMER:END -->\n";
-		expect(stripPrimer(filled).trim()).not.toBe(stripPrimer(blank).trim());
 	});
 });
