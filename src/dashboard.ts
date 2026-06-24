@@ -1,6 +1,5 @@
 import fs from "node:fs";
 import path from "node:path";
-import { trackDashboardOpen } from "./telemetry";
 
 // A dependency-free, build-free dashboard. `bun src/dashboard.ts` serves one HTML
 // page plus a tiny JSON API that shells out to the existing CLI — `export` for
@@ -49,9 +48,9 @@ const serveOptions = {
 		const { pathname } = url;
 
 		if (req.method === "GET" && pathname === "/") {
-			// Anonymous, bounded "dashboard opened" signal — server-side only, so no
-			// browser autocapture can ship the DOM (it shows subject/concept names).
-			trackDashboardOpen();
+			// The dashboard itself is not tracked — telemetry is CLI-only. Its
+			// shell-outs run with LEARN_IT_TELEMETRY=0 (see cli() above), so opening
+			// the web UI emits nothing and never touches learning content in the DOM.
 			const html = fs.readFileSync(HTML, "utf8");
 			return new Response(html, {
 				headers: { "content-type": "text/html; charset=utf-8" },

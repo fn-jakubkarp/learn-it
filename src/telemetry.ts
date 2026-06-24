@@ -88,12 +88,13 @@ function appVersion(): string {
 	}
 }
 
-// PRIVATE sender — the single egress point. Ships EXACTLY the allowlisted fields:
+// PRIVATE sender — the single egress point, run ONLY inside the short-lived,
+// detached child spawned by trackCommand. Ships EXACTLY the allowlisted fields:
 // the event name + command verb + app version + OS, keyed by the anonymous install
-// id. Nothing else is accepted, so no caller can widen what's captured. posthog-node
-// is imported lazily so disabled installs never pay to load it; captureImmediate
-// sends and resolves, then shutdown clears timers. Any failure is swallowed —
-// telemetry is never load-bearing.
+// id. posthog-node is imported lazily so disabled installs never pay to load it;
+// captureImmediate sends, then shutdown clears timers so the child exits promptly.
+// Any failure is swallowed — telemetry is never load-bearing, and since this runs
+// in a throwaway process a skipped shutdown can't leak (the process is about to go).
 async function track(event: string, command: string): Promise<void> {
 	if (!telemetryEnabled()) return;
 	const distinctId = telemetryId();
@@ -109,22 +110,16 @@ async function track(event: string, command: string): Promise<void> {
 			fetchRetryCount: 0,
 			requestTimeout: 3000,
 		});
-		try {
-			await client.captureImmediate({
-				distinctId,
-				event,
-				properties: {
-					command,
-					app_version: appVersion(),
-					os: process.platform,
-				},
-			});
-		} finally {
-			// Always tear the client down — its flush timers would otherwise leak
-			// (notably on the long-lived dashboard, which sends in-process). Async,
-			// so await it; a shutdown failure falls through to the outer swallow.
-			await client.shutdown();
-		}
+		await client.captureImmediate({
+			distinctId,
+			event,
+			properties: {
+				command,
+				app_version: appVersion(),
+				os: process.platform,
+			},
+		});
+		await client.shutdown();
 	} catch {
 		// offline, blocked egress, bad key — never surface to the user.
 	}
@@ -146,13 +141,6 @@ export function trackCommand(command: string | undefined): void {
 	} catch {
 		// spawn failed — telemetry is best-effort, never load-bearing.
 	}
-}
-
-// Typed helper for the long-lived dashboard server: record that the web UI was
-// opened. Fire-and-forget in-process (the server isn't exiting, so there's nothing
-// to delay); no-ops when telemetry is disabled.
-export function trackDashboardOpen(): void {
-	void track("dashboard_open", "dashboard");
 }
 
 // Detached sender entry: `bun src/telemetry.ts send <verb>` performs the real
