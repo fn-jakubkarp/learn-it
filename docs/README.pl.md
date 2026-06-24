@@ -198,7 +198,7 @@ Pełny projekt — wraz z diagramem całego przepływu — znajdziesz w [`docs/A
 
 Learn-it wysyła **anonimową, pozbawioną treści** telemetrię użycia (PostHog), aby narzędzie można było ulepszać na podstawie komend, których ludzie faktycznie używają. Przy pierwszym wysłaniu czegokolwiek wyświetla się wyraźne, jednorazowe powiadomienie.
 
-- **Co wysyła:** uruchomioną komendę (`grade`, `assess`, …), wersję aplikacji, twój system operacyjny oraz losowe id na instalację. Pulpit wysyła wyłącznie anonimowe odsłony stron.
+- **Co wysyła:** uruchomioną komendę (`grade`, `assess`, …), wersję aplikacji, twój system operacyjny oraz losowe id na instalację. Pulpit nie jest śledzony.
 - **Czego nigdy nie wysyła:** nazw przedmiotów, nazw pojęć, treści fiszek, notatek, wyników — *niczego*, czego się uczysz. To zostaje w `data/*.db` na twojej maszynie i nigdy jej nie opuszcza.
 - **Wyłącz w dowolnej chwili:** `export DO_NOT_TRACK=1` ([standard międzynarzędziowy](https://consoledonottrack.com)) lub `export LEARN_IT_TELEMETRY=0`. Uruchomienia w CI są wykluczane automatycznie. Anonimowe id znajduje się w `data/.telemetry-id` — usuń je, aby zresetować.
 

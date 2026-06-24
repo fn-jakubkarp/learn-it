@@ -198,7 +198,7 @@ See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full design — inclu
 
 Learn-it sends **anonymous, content-free** usage telemetry (PostHog) so the tool can be improved based on which commands people actually use. A loud one-time notice prints the first time anything is sent.
 
-- **What it sends:** the command you ran (`grade`, `assess`, …), the app version, your OS, and a random per-install id. The dashboard sends anonymous pageviews only.
+- **What it sends:** the command you ran (`grade`, `assess`, …), the app version, your OS, and a random per-install id. The dashboard isn't tracked.
 - **What it never sends:** subject names, concept names, card text, notes, scores — *anything* you study. That stays in `data/*.db` on your machine and never leaves it.
 - **Opt out any time:** `export DO_NOT_TRACK=1` (the [cross-tool standard](https://consoledonottrack.com)) or `export LEARN_IT_TELEMETRY=0`. CI runs are excluded automatically. The anonymous id lives at `data/.telemetry-id` — delete it to reset.
 

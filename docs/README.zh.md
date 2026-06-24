@@ -198,7 +198,7 @@ diagnose → conceptualize → recall → space → verify → mastered
 
 Learn-it 会发送**匿名、不含内容**的使用情况遥测（PostHog），以便根据大家实际使用的命令来改进工具。首次发送任何数据时会打印一条醒目的一次性提示。
 
-- **发送的内容：** 你运行的命令（`grade`、`assess` 等）、应用版本、操作系统，以及一个随机的每次安装 id。仪表盘只发送匿名的页面浏览。
+- **发送的内容：** 你运行的命令（`grade`、`assess` 等）、应用版本、操作系统，以及一个随机的每次安装 id。仪表盘不会被追踪。
 - **绝不发送的内容：** 科目名、概念名、卡片内容、笔记、分数——任何你学习的东西。这些都留在你机器上的 `data/*.db` 中，绝不外传。
 - **随时退出：** `export DO_NOT_TRACK=1`（[跨工具标准](https://consoledonottrack.com)）或 `export LEARN_IT_TELEMETRY=0`。CI 运行会被自动排除。匿名 id 位于 `data/.telemetry-id`——删除它即可重置。
 

@@ -198,7 +198,7 @@ Consulta [`docs/ARCHITECTURE.md`](./ARCHITECTURE.md) para el diseño completo, i
 
 Learn-it envía telemetría de uso **anónima y sin contenido** (PostHog) para poder mejorar la herramienta según los comandos que la gente realmente usa. La primera vez que se envía algo se imprime un aviso destacado y único.
 
-- **Qué envía:** el comando que ejecutaste (`grade`, `assess`, …), la versión de la app, tu SO y un id aleatorio por instalación. El panel solo envía vistas de página anónimas.
+- **Qué envía:** el comando que ejecutaste (`grade`, `assess`, …), la versión de la app, tu SO y un id aleatorio por instalación. El panel no se rastrea.
 - **Qué nunca envía:** nombres de materias, nombres de conceptos, texto de tarjetas, notas, puntuaciones — *nada* de lo que estudias. Eso se queda en `data/*.db` en tu máquina y nunca sale de ahí.
 - **Exclúyete cuando quieras:** `export DO_NOT_TRACK=1` (el [estándar entre herramientas](https://consoledonottrack.com)) o `export LEARN_IT_TELEMETRY=0`. Las ejecuciones en CI se excluyen automáticamente. El id anónimo está en `data/.telemetry-id`; bórralo para reiniciarlo.
 

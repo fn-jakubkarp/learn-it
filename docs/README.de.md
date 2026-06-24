@@ -198,7 +198,7 @@ Das vollständige Design — samt einem Diagramm des gesamten Ablaufs — findes
 
 Learn-it sendet **anonyme, inhaltsfreie** Nutzungstelemetrie (PostHog), damit das Tool anhand der tatsächlich genutzten Befehle verbessert werden kann. Beim ersten Senden wird ein deutlicher einmaliger Hinweis ausgegeben.
 
-- **Was gesendet wird:** der ausgeführte Befehl (`grade`, `assess`, …), die App-Version, dein Betriebssystem und eine zufällige Id pro Installation. Das Dashboard sendet nur anonyme Seitenaufrufe.
+- **Was gesendet wird:** der ausgeführte Befehl (`grade`, `assess`, …), die App-Version, dein Betriebssystem und eine zufällige Id pro Installation. Das Dashboard wird nicht erfasst.
 - **Was nie gesendet wird:** Fachnamen, Konzeptnamen, Kartentext, Notizen, Bewertungen — *alles*, was du lernst. Das bleibt in `data/*.db` auf deinem Rechner und verlässt ihn nie.
 - **Jederzeit abschaltbar:** `export DO_NOT_TRACK=1` (der [werkzeugübergreifende Standard](https://consoledonottrack.com)) oder `export LEARN_IT_TELEMETRY=0`. CI-Läufe werden automatisch ausgeschlossen. Die anonyme Id liegt in `data/.telemetry-id` — löschen setzt sie zurück.
 
