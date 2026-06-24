@@ -36,4 +36,19 @@ describe("isTelemetryDisabled — opt-out matrix", () => {
 	test("CI disables (automated runs aren't adoption)", () => {
 		expect(isTelemetryDisabled({ CI: "true" }, REAL_KEY)).toBe(true);
 	});
+
+	test("opt-out values are trimmed and case-insensitive", () => {
+		// A misspelled-case or padded opt-out must still opt out.
+		expect(isTelemetryDisabled({ LEARN_IT_TELEMETRY: "FALSE" }, REAL_KEY)).toBe(
+			true,
+		);
+		expect(isTelemetryDisabled({ LEARN_IT_TELEMETRY: " 0 " }, REAL_KEY)).toBe(
+			true,
+		);
+		expect(isTelemetryDisabled({ DO_NOT_TRACK: " 1 " }, REAL_KEY)).toBe(true);
+		// ...and normalized 0/false still means "tracking allowed", not opt-out.
+		expect(isTelemetryDisabled({ DO_NOT_TRACK: " FALSE " }, REAL_KEY)).toBe(
+			false,
+		);
+	});
 });

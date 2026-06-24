@@ -47,10 +47,12 @@ export function isTelemetryDisabled(
 	env: Record<string, string | undefined>,
 	key: string,
 ): boolean {
-	const dnt = env.DO_NOT_TRACK;
+	// Normalize (trim + lowercase) so " 1 ", "FALSE", "False" honor the user's
+	// intent — a misspelled-case opt-out must still opt out.
+	const dnt = env.DO_NOT_TRACK?.trim().toLowerCase();
 	if (dnt && dnt !== "0" && dnt !== "false") return true;
-	if (env.LEARN_IT_TELEMETRY === "0" || env.LEARN_IT_TELEMETRY === "false")
-		return true;
+	const lit = env.LEARN_IT_TELEMETRY?.trim().toLowerCase();
+	if (lit === "0" || lit === "false") return true;
 	if (env.CI) return true;
 	if (!key) return true;
 	return false;
@@ -125,6 +127,52 @@ async function track(event: string, command: string): Promise<void> {
 	}
 }
 
+// The CLI router's documented verbs — the ONLY strings allowed to leave the
+// machine. This egress allowlist lives here (not at the call site) so the privacy
+// guarantee holds at the telemetry boundary regardless of caller. Keep in sync with
+// the switch in src/learn-it.ts.
+const TRACKED_COMMANDS = new Set([
+	"resume",
+	"status",
+	"init",
+	"addconcept",
+	"concepts",
+	"advise",
+	"addcard",
+	"show",
+	"editcard",
+	"delcard",
+	"delconcept",
+	"ungrade",
+	"suspend",
+	"probe",
+	"target",
+	"due",
+	"due-concepts",
+	"reinforce",
+	"expose",
+	"mark",
+	"grade",
+	"note",
+	"sessions",
+	"assess",
+	"assessments",
+	"evaluate",
+	"mastery",
+	"export",
+	"fmt",
+	"doctor",
+	"db",
+]);
+
+// Clamp any input to an allowlisted verb: a missing command is the router's
+// "resume" default; anything unrecognized (a typo, or a stray subject/concept name
+// from a malformed invocation) becomes "unknown" so no user-typed string leaks.
+function trackedVerb(command: string | undefined): string {
+	if (command === undefined) return "resume";
+	return TRACKED_COMMANDS.has(command) ? command : "unknown";
+}
+
 // Typed helper for the CLI router: record a command VERB (never argv — args carry
 // subject/concept names = learning content). Dispatched OFF-PROCESS so it can never
 // add latency: we create the id + print the one-time notice synchronously here, then
@@ -135,7 +183,7 @@ export function trackCommand(command: string | undefined): void {
 	if (!telemetryId()) return;
 	try {
 		Bun.spawn(
-			[process.execPath, import.meta.path, "send", command ?? "resume"],
+			[process.execPath, import.meta.path, "send", trackedVerb(command)],
 			{ stdin: "ignore", stdout: "ignore", stderr: "ignore" },
 		).unref();
 	} catch {
@@ -147,5 +195,5 @@ export function trackCommand(command: string | undefined): void {
 // network send in its own process (spawned by trackCommand) and exits when done.
 if (import.meta.main) {
 	const [mode, verb] = process.argv.slice(2);
-	if (mode === "send") void track("cli_command", verb ?? "resume");
+	if (mode === "send") void track("cli_command", trackedVerb(verb));
 }

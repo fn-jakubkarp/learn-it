@@ -1332,49 +1332,9 @@ function main() {
 
 main();
 
-// The router's documented verbs. Telemetry forwards ONLY these — an unrecognized
-// first token (a typo, or a stray subject/concept name on a malformed invocation)
-// maps to "unknown" so no user-typed string ever rides out on the wire. Keep in
-// sync with main()'s switch above.
-const TRACKED_COMMANDS = new Set([
-	"resume",
-	"status",
-	"init",
-	"addconcept",
-	"concepts",
-	"advise",
-	"addcard",
-	"show",
-	"editcard",
-	"delcard",
-	"delconcept",
-	"ungrade",
-	"suspend",
-	"probe",
-	"target",
-	"due",
-	"due-concepts",
-	"reinforce",
-	"expose",
-	"mark",
-	"grade",
-	"note",
-	"sessions",
-	"assess",
-	"assessments",
-	"evaluate",
-	"mastery",
-	"export",
-	"fmt",
-	"doctor",
-	"db",
-]);
-
 // Anonymous adoption telemetry: the command VERB only, never argv (args carry
-// subject/concept names = learning content). Clamped to the allowlist above so an
-// unknown token can't leak. Dispatched off-process (a detached, unref'd child does
-// the network send), so it never delays the command's exit, and the whole thing
-// no-ops unless a real PostHog key is configured.
-trackCommand(
-	command === undefined || TRACKED_COMMANDS.has(command) ? command : "unknown",
-);
+// subject/concept names = learning content). trackCommand clamps the verb to the
+// router's allowlist and dispatches off-process (a detached, unref'd child does the
+// network send), so it never delays the command's exit, and the whole thing no-ops
+// unless a real PostHog key is configured.
+trackCommand(command);
