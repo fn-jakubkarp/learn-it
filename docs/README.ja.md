@@ -4,7 +4,7 @@
 
 <!-- README-I18N:START -->
 
-[English](./README.md) | [中文](./README.zh.md) | [Español](./README.es.md) | [Polski](./README.pl.md) | **日本語** | [Deutsch](./README.de.md)
+[English](../README.md) | [中文](./README.zh.md) | [Español](./README.es.md) | [Polski](./README.pl.md) | **日本語** | [Deutsch](./README.de.md)
 
 <!-- README-I18N:END -->
 
@@ -57,6 +57,31 @@ bun install
 bun src/init-db.ts          # create data/learn_it.db
 bun run verify              # optional: biome + tsc + bun test
 ```
+
+</details>
+
+<details>
+<summary>テレメトリなしでインストール</summary>
+
+**最初の実行より前に**オプトアウトを書き込みます。Bun は `.env` を自動で読み込むため、最初のコマンドからテレメトリは無効になります（初回通知も出ず、id も一切生成されません）。`.env` は gitignore 済みです。
+
+**Linux / macOS**
+
+```bash
+git clone https://github.com/fn-jakubkarp/learn-it.git && cd learn-it
+echo "LEARN_IT_TELEMETRY=0" > .env
+bun install && bun src/init-db.ts
+```
+
+**Windows (PowerShell)**
+
+```powershell
+git clone https://github.com/fn-jakubkarp/learn-it.git; cd learn-it
+"LEARN_IT_TELEMETRY=0" | Out-File -Encoding ascii .env
+bun install; bun src/init-db.ts
+```
+
+システム全体で切り替えたい場合は？`export DO_NOT_TRACK=1` で、本ツールと[この標準](https://consoledonottrack.com)に従う他のあらゆるツールからオプトアウトできます。
 
 </details>
 
@@ -161,8 +186,17 @@ diagnose → conceptualize → recall → space → verify → mastered
 | `src/mastery.ts` | Dreyfus 段階。概念＋証拠で積み上げる（量は加点しない）。 |
 | `src/init-db.ts` | SQLite スキーマを作成／移行する。 |
 | `src/dashboard.ts` | ビルド不要のローカル Web ダッシュボード。 |
+| `src/telemetry.ts` | 匿名・内容を含まない利用テレメトリ（オプトアウト可）。 |
 
-全体の流れを示す図を含む完全な設計は [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) を参照してください。
+全体の流れを示す図を含む完全な設計は [`docs/ARCHITECTURE.md`](./ARCHITECTURE.md) を参照してください。
+
+## テレメトリ
+
+Learn-it は、実際に使われているコマンドに基づいてツールを改善するため、**匿名・内容を含まない**利用テレメトリ（PostHog）を送信します。何かを初めて送信する際に、目立つ一度きりの通知を表示します。
+
+- **送信する内容：** 実行したコマンド（`grade`、`assess` など）、アプリのバージョン、OS、インストールごとのランダムな id。ダッシュボードは匿名のページビューのみを送信します。
+- **決して送信しない内容：** 科目名、概念名、カードの本文、メモ、スコア — あなたが学ぶ*あらゆるもの*。これらはあなたのマシンの `data/*.db` に留まり、外に出ることはありません。
+- **いつでもオプトアウト：** `export DO_NOT_TRACK=1`（[ツール横断の標準](https://consoledonottrack.com)）または `export LEARN_IT_TELEMETRY=0`。CI 実行は自動的に除外されます。匿名 id は `data/.telemetry-id` にあり、削除すればリセットされます。
 
 ## 謝辞
 

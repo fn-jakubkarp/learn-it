@@ -4,7 +4,7 @@
 
 <!-- README-I18N:START -->
 
-**English** | [中文](./README.zh.md) | [Español](./README.es.md) | [Polski](./README.pl.md) | [日本語](./README.ja.md) | [Deutsch](./README.de.md)
+**English** | [中文](./docs/README.zh.md) | [Español](./docs/README.es.md) | [Polski](./docs/README.pl.md) | [日本語](./docs/README.ja.md) | [Deutsch](./docs/README.de.md)
 
 <!-- README-I18N:END -->
 
@@ -57,6 +57,31 @@ bun install
 bun src/init-db.ts          # create data/learn_it.db
 bun run verify              # optional: biome + tsc + bun test
 ```
+
+</details>
+
+<details>
+<summary>Install without telemetry</summary>
+
+Write the opt-out **before the first run** — Bun auto-loads `.env`, so every command is disabled from the start (no first-run notice, no id ever created). `.env` is gitignored.
+
+**Linux / macOS**
+
+```bash
+git clone https://github.com/fn-jakubkarp/learn-it.git && cd learn-it
+echo "LEARN_IT_TELEMETRY=0" > .env
+bun install && bun src/init-db.ts
+```
+
+**Windows (PowerShell)**
+
+```powershell
+git clone https://github.com/fn-jakubkarp/learn-it.git; cd learn-it
+"LEARN_IT_TELEMETRY=0" | Out-File -Encoding ascii .env
+bun install; bun src/init-db.ts
+```
+
+Prefer a system-wide switch? `export DO_NOT_TRACK=1` opts out of this and any other tool that respects [the standard](https://consoledonottrack.com).
 
 </details>
 
@@ -161,8 +186,17 @@ The one rule: the engine writes *State*, reads *Knowledge*, and never edits a fi
 | `src/mastery.ts` | Dreyfus tiers, rolled up over concepts + evidence (no volume credit). |
 | `src/init-db.ts` | Creates / migrates the SQLite schema. |
 | `src/dashboard.ts` | Build-free local web dashboard. |
+| `src/telemetry.ts` | Anonymous, content-free adoption telemetry (opt-out). |
 
 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full design — including a diagram of the whole flow.
+
+## Telemetry
+
+Learn-it sends **anonymous, content-free** usage telemetry (PostHog) so the tool can be improved based on which commands people actually use. A loud one-time notice prints the first time anything is sent.
+
+- **What it sends:** the command you ran (`grade`, `assess`, …), the app version, your OS, and a random per-install id. The dashboard sends anonymous pageviews only.
+- **What it never sends:** subject names, concept names, card text, notes, scores — *anything* you study. That stays in `data/*.db` on your machine and never leaves it.
+- **Opt out any time:** `export DO_NOT_TRACK=1` (the [cross-tool standard](https://consoledonottrack.com)) or `export LEARN_IT_TELEMETRY=0`. CI runs are excluded automatically. The anonymous id lives at `data/.telemetry-id` — delete it to reset.
 
 ## Acknowledgements
 

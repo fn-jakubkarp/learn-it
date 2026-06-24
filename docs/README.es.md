@@ -4,7 +4,7 @@
 
 <!-- README-I18N:START -->
 
-[English](./README.md) | [中文](./README.zh.md) | **Español** | [Polski](./README.pl.md) | [日本語](./README.ja.md) | [Deutsch](./README.de.md)
+[English](../README.md) | [中文](./README.zh.md) | **Español** | [Polski](./README.pl.md) | [日本語](./README.ja.md) | [Deutsch](./README.de.md)
 
 <!-- README-I18N:END -->
 
@@ -57,6 +57,31 @@ bun install
 bun src/init-db.ts          # create data/learn_it.db
 bun run verify              # optional: biome + tsc + bun test
 ```
+
+</details>
+
+<details>
+<summary>Instalar sin telemetría</summary>
+
+Escribe la exclusión **antes de la primera ejecución**: Bun carga `.env` automáticamente, así que cada comando queda desactivado desde el principio (sin aviso inicial, sin que se cree ningún id). `.env` está en gitignore.
+
+**Linux / macOS**
+
+```bash
+git clone https://github.com/fn-jakubkarp/learn-it.git && cd learn-it
+echo "LEARN_IT_TELEMETRY=0" > .env
+bun install && bun src/init-db.ts
+```
+
+**Windows (PowerShell)**
+
+```powershell
+git clone https://github.com/fn-jakubkarp/learn-it.git; cd learn-it
+"LEARN_IT_TELEMETRY=0" | Out-File -Encoding ascii .env
+bun install; bun src/init-db.ts
+```
+
+¿Prefieres un interruptor para todo el sistema? `export DO_NOT_TRACK=1` te excluye de esta y de cualquier otra herramienta que respete [el estándar](https://consoledonottrack.com).
 
 </details>
 
@@ -161,8 +186,17 @@ La única regla: el motor escribe el *Estado*, lee el *Conocimiento* y nunca edi
 | `src/mastery.ts` | Niveles de Dreyfus, agregados sobre conceptos + evidencia (el volumen no puntúa). |
 | `src/init-db.ts` | Crea / migra el esquema SQLite. |
 | `src/dashboard.ts` | Panel web local sin compilación. |
+| `src/telemetry.ts` | Telemetría de uso anónima y sin contenido (opt-out). |
 
-Consulta [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) para el diseño completo, incluido un diagrama de todo el flujo.
+Consulta [`docs/ARCHITECTURE.md`](./ARCHITECTURE.md) para el diseño completo, incluido un diagrama de todo el flujo.
+
+## Telemetría
+
+Learn-it envía telemetría de uso **anónima y sin contenido** (PostHog) para poder mejorar la herramienta según los comandos que la gente realmente usa. La primera vez que se envía algo se imprime un aviso destacado y único.
+
+- **Qué envía:** el comando que ejecutaste (`grade`, `assess`, …), la versión de la app, tu SO y un id aleatorio por instalación. El panel solo envía vistas de página anónimas.
+- **Qué nunca envía:** nombres de materias, nombres de conceptos, texto de tarjetas, notas, puntuaciones — *nada* de lo que estudias. Eso se queda en `data/*.db` en tu máquina y nunca sale de ahí.
+- **Exclúyete cuando quieras:** `export DO_NOT_TRACK=1` (el [estándar entre herramientas](https://consoledonottrack.com)) o `export LEARN_IT_TELEMETRY=0`. Las ejecuciones en CI se excluyen automáticamente. El id anónimo está en `data/.telemetry-id`; bórralo para reiniciarlo.
 
 ## Agradecimientos
 

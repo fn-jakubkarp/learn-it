@@ -4,7 +4,7 @@
 
 <!-- README-I18N:START -->
 
-[English](./README.md) | [中文](./README.zh.md) | [Español](./README.es.md) | **Polski** | [日本語](./README.ja.md) | [Deutsch](./README.de.md)
+[English](../README.md) | [中文](./README.zh.md) | [Español](./README.es.md) | **Polski** | [日本語](./README.ja.md) | [Deutsch](./README.de.md)
 
 <!-- README-I18N:END -->
 
@@ -57,6 +57,31 @@ bun install
 bun src/init-db.ts          # create data/learn_it.db
 bun run verify              # optional: biome + tsc + bun test
 ```
+
+</details>
+
+<details>
+<summary>Instalacja bez telemetrii</summary>
+
+Zapisz wyłączenie **przed pierwszym uruchomieniem** — Bun automatycznie wczytuje `.env`, więc każda komenda jest wyłączona od samego początku (bez powiadomienia przy pierwszym uruchomieniu, bez tworzenia jakiegokolwiek id). `.env` jest w gitignore.
+
+**Linux / macOS**
+
+```bash
+git clone https://github.com/fn-jakubkarp/learn-it.git && cd learn-it
+echo "LEARN_IT_TELEMETRY=0" > .env
+bun install && bun src/init-db.ts
+```
+
+**Windows (PowerShell)**
+
+```powershell
+git clone https://github.com/fn-jakubkarp/learn-it.git; cd learn-it
+"LEARN_IT_TELEMETRY=0" | Out-File -Encoding ascii .env
+bun install; bun src/init-db.ts
+```
+
+Wolisz przełącznik dla całego systemu? `export DO_NOT_TRACK=1` wyłącza telemetrię w tym narzędziu i w każdym innym, które respektuje [ten standard](https://consoledonottrack.com).
 
 </details>
 
@@ -161,8 +186,17 @@ Jedyna zasada: silnik zapisuje *Stan*, czyta *Wiedzę* i nigdy nie edytuje pliku
 | `src/mastery.ts` | Poziomy Dreyfusa, agregowane po pojęciach + dowodach (ilość nie liczy się do punktów). |
 | `src/init-db.ts` | Tworzy / migruje schemat SQLite. |
 | `src/dashboard.ts` | Lokalny pulpit webowy bez budowania. |
+| `src/telemetry.ts` | Anonimowa, pozbawiona treści telemetria użycia (opt-out). |
 
-Pełny projekt — wraz z diagramem całego przepływu — znajdziesz w [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+Pełny projekt — wraz z diagramem całego przepływu — znajdziesz w [`docs/ARCHITECTURE.md`](./ARCHITECTURE.md).
+
+## Telemetria
+
+Learn-it wysyła **anonimową, pozbawioną treści** telemetrię użycia (PostHog), aby narzędzie można było ulepszać na podstawie komend, których ludzie faktycznie używają. Przy pierwszym wysłaniu czegokolwiek wyświetla się wyraźne, jednorazowe powiadomienie.
+
+- **Co wysyła:** uruchomioną komendę (`grade`, `assess`, …), wersję aplikacji, twój system operacyjny oraz losowe id na instalację. Pulpit wysyła wyłącznie anonimowe odsłony stron.
+- **Czego nigdy nie wysyła:** nazw przedmiotów, nazw pojęć, treści fiszek, notatek, wyników — *niczego*, czego się uczysz. To zostaje w `data/*.db` na twojej maszynie i nigdy jej nie opuszcza.
+- **Wyłącz w dowolnej chwili:** `export DO_NOT_TRACK=1` ([standard międzynarzędziowy](https://consoledonottrack.com)) lub `export LEARN_IT_TELEMETRY=0`. Uruchomienia w CI są wykluczane automatycznie. Anonimowe id znajduje się w `data/.telemetry-id` — usuń je, aby zresetować.
 
 ## Podziękowania
 
