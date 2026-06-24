@@ -14,6 +14,8 @@ subjects/*
 # the database plus its WAL sidecar files (-wal / -shm / -journal)
 data/*.db
 data/*.db-*
+# anonymous per-install telemetry id (never commit; delete to reset)
+data/.telemetry-id
 
 # code coverage
 coverage

@@ -46,6 +46,7 @@ import {
 	replayCard,
 	today,
 } from "./scheduler";
+import { trackCommand } from "./telemetry";
 
 // Resolve the DB relative to THIS file, not the caller's cwd — otherwise running
 // from another directory silently CREATEs a fresh empty db there and abandons all
@@ -1330,3 +1331,9 @@ function main() {
 }
 
 main();
+
+// Anonymous adoption telemetry: the command VERB only, never argv (args carry
+// subject/concept names = learning content). Fire-and-flush after the command so
+// it never delays output; the pending request keeps the process alive until it
+// ships, and the whole thing no-ops unless a real PostHog key is configured.
+void trackCommand(command);
