@@ -66,8 +66,8 @@ Otwórz swoje agentowe CLI **wewnątrz repozytorium** - silnik działa z katalog
 
 ```
 /learn-it                   # dashboard across all subjects + the command menu
-/learn-it init rust         # start a subject (fill its audit.md)
-/learn-it plan rust         # turn the audit into a roadmap of concepts
+/learn-it init rust         # start a subject (just your goal — no self-inventory)
+/learn-it explore-gaps rust # the diagnostic: it tests you and places you, you don't self-report
 /learn-it reinforce         # the daily loop: spaced, varied re-exposure of due concepts
 ```
 
@@ -80,9 +80,9 @@ Każdy etap uruchamia się na żądanie - nic nie jest zablokowane. `[subject]` 
 | Etap | Co robi |
 | --- | --- |
 | `/learn-it` | Uruchamia pulpit, a następnie wypisuje stan i menu poleceń dla wszystkich tematów. |
-| `init {subject}` | Tworzy szkielet tematu i otwiera `audit.md` do wypełnienia. |
-| `explore-topic {subject}` | Szkicuje kandydacką mapę pojęć i rejestruje ją. |
-| `explore-gaps {subject}` | Sonduje jedno pojęcie naraz, umieszcza cię na rzeczywistym poziomie i ustawia `target`. |
+| `init {subject} [slug]` | Tworzy szkielet tematu i zapisuje twój **cel** (dlaczego + meta). Nadaje krótki, ascii **slug** (np. `egzamin-krotkofalowca-klasa-1`) — stabilny, bezpieczny w cudzysłowie identyfikator, który przekazujesz do późniejszych poleceń (pełna nazwa też działa). Bez samooceny — poziom jest mierzony, nie deklarowany. |
+| `explore-topic {subject}` | Mapuje **całe** terytorium na pojęcia i rejestruje je — pokrycie pochodzi z dziedziny, nie z twojej pamięci, więc nienazwane luki też trafiają na mapę. |
+| `explore-gaps {subject}` | Sonduje jedno pojęcie naraz (reagujesz na podpowiedź, nie przypominasz swobodnie), uczy jednozdaniowej esencji przy każdej luce i wypisuje raport 🟢/🟡/🔴 o tym, gdzie naprawdę jesteś. Ustawia `target`. |
 | `plan {subject}` | Uzgadnia mapę z wynikami sondowania; porządkuje ją od podstaw. |
 
 **Nauka i zakotwiczanie**
@@ -130,7 +130,7 @@ bun src/dashboard.ts        # → http://localhost:4321
 
 **Dwa poziomy.** *Temat (subject)* to rzecz, którą opanowujesz (np. „Rust”), i nosi mapę drogową, fazę oraz poziom Dreyfusa. *Pojęcie (concept)* to liść wielkości lekcji pod nim (np. „ownership”); fiszki podpinają się tutaj. Mapa drogowa to lista pojęć, a biegłość agreguje się z niej - nie możesz być „ekspertem” w pojedynczym fakcie.
 
-**Fazy to mapa, nie tory kolejowe.** Learn-it odczytuje twój rzeczywisty stan (audyt wypełniony? pojęcia zaplanowane? fiszki powtórzone?), by wywnioskować, gdzie znajduje się każdy temat. Nic nie jest zablokowane.
+**Fazy to mapa, nie tory kolejowe.** Learn-it odczytuje twój rzeczywisty stan (pojęcia zmapowane? *sprawdzone*? fiszki powtórzone?), by wywnioskować, gdzie znajduje się każdy temat — diagnose zostaje za tobą, gdy zostałeś przetestowany, nigdy gdy wypełniłeś formularz. Nic nie jest zablokowane.
 
 ```
 diagnose → conceptualize → recall → space → verify → mastered
@@ -162,7 +162,7 @@ Jedyna zasada: silnik zapisuje *Stan*, czyta *Wiedzę* i nigdy nie edytuje pliku
 | `src/init-db.ts` | Tworzy / migruje schemat SQLite. |
 | `src/dashboard.ts` | Lokalny pulpit webowy bez budowania. |
 
-Pełny projekt znajdziesz w [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+Pełny projekt — wraz z diagramem całego przepływu — znajdziesz w [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ## Podziękowania
 

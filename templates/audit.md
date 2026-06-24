@@ -3,28 +3,23 @@ type: audit
 subject: {{subject}}
 ---
 
-# Audit: {{subject}}
+# {{subject}}
 
-<!-- Step 1 of 3 — just your starting hunch, in your own words. Not a test, not
-     graded, and you don't need to be complete: the next steps map the whole field
-     and quiz you, so anything you miss here gets caught. Two minutes is plenty.
-     Skip any bucket that doesn't apply. -->
+<!-- This is NOT a test and NOT a form to fill. You write ONE thing: your goal,
+     below. Where you actually stand gets *measured* by the diagnostic
+     (explore-gaps) and written here for you — placement is earned by answering
+     questions, never by self-report. Trying to recall "everything I know" onto a
+     blank page is the hardest, least reliable thing you could do; we don't ask it
+     of you. -->
 
-## Know — could explain it cold, right now
-- 
+## Goal — the only thing you write
+<!-- One line each, or skip and tell the agent out loud. -->
+- Why I'm learning this: 
+- Target tier: novice | competent | proficient | expert
 
-## Vague — heard of it, couldn't teach it
-- 
-
-## Blank — don't know what I don't know
-- 
-
-## Why I'm learning this (goal / target)
-- 
-
-## A few areas this touches — a nudge, not a checklist
-<!-- Fill your own buckets above FIRST, then skim these for anything you forgot.
-     Recognising one isn't knowing it — drop it into the bucket where it honestly
-     belongs (or ignore it). The agent writes these on init. -->
-<!-- PRIMER:START -->
-<!-- PRIMER:END -->
+## Where you stand — written FOR you by the diagnostic
+<!-- Don't fill this in. explore-gaps probes you concept by concept and writes the
+     calibrated result between the markers: what you can actually do (🟢), what you
+     think you know but fall off on (🟡), and what you never named (🔴). -->
+<!-- DIAGNOSIS:START -->
+<!-- DIAGNOSIS:END -->

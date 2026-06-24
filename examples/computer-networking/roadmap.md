@@ -5,8 +5,9 @@ subject: computer-networking
 
 # Roadmap: computer-networking
 
-Generated from the audit, ordered foundation-first. Each leaf is a registered
-**concept** (`addconcept`), and coverage + mastery are measured against this list.
+Mapped from the full territory (not the learner's recall), ordered foundation-first.
+Each leaf is a registered **concept** (`addconcept`), and coverage + mastery are
+measured against this list.
 
 ## 1. Addressing
 - IP address types (IPv4 vs IPv6, public vs private)

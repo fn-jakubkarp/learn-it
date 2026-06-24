@@ -66,8 +66,8 @@ bun run verify              # optional: biome + tsc + bun test
 
 ```
 /learn-it                   # dashboard across all subjects + the command menu
-/learn-it init rust         # start a subject (fill its audit.md)
-/learn-it plan rust         # turn the audit into a roadmap of concepts
+/learn-it init rust         # start a subject (just your goal — no self-inventory)
+/learn-it explore-gaps rust # the diagnostic: it tests you and places you, you don't self-report
 /learn-it reinforce         # the daily loop: spaced, varied re-exposure of due concepts
 ```
 
@@ -80,9 +80,9 @@ bun run verify              # optional: biome + tsc + bun test
 | 阶段 | 作用 |
 | --- | --- |
 | `/learn-it` | 启动仪表盘，然后打印横跨所有主题的状态与命令菜单。 |
-| `init {subject}` | 搭建该主题的骨架，并打开 `audit.md` 供你填写。 |
-| `explore-topic {subject}` | 起草一份候选概念图并登记它。 |
-| `explore-gaps {subject}` | 一次只探查一个概念，把你定位到真实水平，并设定一个 `target`。 |
+| `init {subject} [slug]` | 搭建该主题的骨架，并记录你的**目标**（为什么 + 目标水平）。分配一个简短的 ascii **slug**（例如 `egzamin-krotkofalowca-klasa-1`）——这是你传给后续命令的稳定、引号安全的 id（完整名称也可用）。无需自我盘点——定位是测出来的，不是声明出来的。 |
+| `explore-topic {subject}` | 把**整个**领域映射成概念并登记——覆盖来自该领域本身，而非你的回忆，因此未被你说出的空白也会落到图上。 |
+| `explore-gaps {subject}` | 一次只探查一个概念（对线索作出反应，而非自由回忆），在每个空白处教一句话要点，并写出一份 🟢/🟡/🔴 的现状读数。设定一个 `target`。 |
 | `plan {subject}` | 用探查结果校正概念图；按基础优先的顺序排列。 |
 
 **学习与锚定**
@@ -130,7 +130,7 @@ bun src/dashboard.ts        # → http://localhost:4321
 
 **两个层级。** 一个*主题（subject）*是你要掌握的东西（例如「Rust」），它承载路线图、阶段和 Dreyfus 等级。一个*概念（concept）*是它之下、课时大小的叶子节点（例如「ownership」）；卡片挂在这里。路线图就是概念清单，掌握度由它汇总而来--你不可能在单个事实上成为「专家」。
 
-**阶段是地图，不是铁轨。** Learn-it 读取你的真实状态（审计填了吗？概念规划了吗？卡片复习了吗？）来推断每个主题所处的位置。没有任何阻挡。
+**阶段是地图，不是铁轨。** Learn-it 读取你的真实状态（概念映射了吗？*探查过了吗*？卡片复习了吗？）来推断每个主题所处的位置——当你被测试过后，diagnose 才会被甩在身后，而不是在你填完表单后。没有任何阻挡。
 
 ```
 diagnose → conceptualize → recall → space → verify → mastered
@@ -162,7 +162,7 @@ diagnose → conceptualize → recall → space → verify → mastered
 | `src/init-db.ts` | 创建 / 迁移 SQLite 架构。 |
 | `src/dashboard.ts` | 免构建的本地 Web 仪表盘。 |
 
-完整设计参见 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)。
+完整设计（含整个流程的图示）参见 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)。
 
 ## 致谢
 

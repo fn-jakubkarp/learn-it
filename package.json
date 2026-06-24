@@ -1,6 +1,6 @@
 {
 	"name": "learn-it",
-	"version": "0.1.0",
+	"version": "0.2.0",
 	"description": "An AI learning pipeline that builds knowledge that lasts — spaced repetition (FSRS), active recall, Feynman, Bloom depth, and a Dreyfus mastery score you can't fake.",
 	"type": "module",
 	"license": "MIT",

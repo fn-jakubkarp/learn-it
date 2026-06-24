@@ -19,6 +19,8 @@ All paths below (`stages/`, `templates/`, `src/`, `data/`) are **relative to the
 
 - **Start by launching the web dashboard:** on no args, start the server in the **background** (it's long-running — never run it in the foreground, it won't return; use your tool's background-run mechanism): `bun src/dashboard.ts`. Surface **http://localhost:4321** (it reports + exits clean if a server already holds the port, so re-running is safe). Then print the text state for the chat: `bun src/learn-it.ts` — state + command menu across all subjects, surfaced as-is; don't paraphrase it.
 - **Watcher advises, never blocks:** `bun src/learn-it.ts advise {stage} "{subject}"` → on a `NOTE`, surface it, then honor the learner's choice. There is no `advance`; phase follows reality.
+- **Subjects have a slug:** `init "<name>" [slug]` creates a short, ascii, filesystem-safe **slug** (e.g. `egzamin-krotkofalowca-klasa-1`) alongside the human display name. **Use the slug as the `{subject}` argument** in every command — it's stable and quote-safe, where a name with spaces/diacritics is fragile. Commands also accept the full name, but prefer the slug; `resume`/`export` print it.
+- **Counts come from the engine, never your head:** report concept/probe/card/due/assessment counts from `db` / `mastery` / `export` output, not a tally you kept while talking — a remembered count drifts (an off-by-one between "9 probed" and what the db holds reads as untrustworthy). When they disagree, the db wins; say so.
 - **Pin the grader:** prefix every `grade` / `evaluate` / `probe` with `LEARN_IT_GRADER="<your-model-id>"`, inline on each call (an unset grader logs `unpinned`). Scores are LLM-graded — provenance is the soft spot in un-gameable mastery.
 - **Double-grade tier-promoting evidence** (a `build`, an expert-gate `explain`, or an `apply` ≥ 90): grade twice, independently, record the lower.
 - **Frontmatter on every learner markdown:** audit / roadmap / notes / assessment files open with a YAML header (`type:`, `subject:`). Templates ship with it; when you author `roadmap.md` / `notes.md`, add it. `bun src/learn-it.ts fmt [subject]` backfills any file missing one.
@@ -36,7 +38,7 @@ Each stage's commands and method live in its `stages/` prompt — read it and ex
 | stage | reads | does |
 |-------|-------|------|
 | (no args) | — | launch web dashboard in the background (`bun src/dashboard.ts` → http://localhost:4321), then `bun src/learn-it.ts` → text state + command menu. Show as-is. |
-| init {subject} | `stages/init.md` | scaffold the subject + open `audit.md` to fill |
+| init {subject} [slug] | `stages/init.md` | scaffold the subject (assigns a short slug) + capture the goal (why + target); placement is measured later, not declared |
 | explore-topic {subject} | `stages/explore-topic.md` | draft the candidate concept map + register it |
 | explore-gaps {subject} | `stages/explore-gaps.md` | probe one concept at a time; place + set `target` |
 | plan {subject} | `stages/plan.md` | reconcile the map with probe findings, order it foundation-first |
