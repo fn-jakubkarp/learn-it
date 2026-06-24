@@ -8,6 +8,10 @@
 
 <!-- README-I18N:END -->
 
+<p align="center">
+  <img src="docs/diag-teaser.gif" alt="learn-it diagnoses you concept by concept, grades each, and writes a calibrated readout of where you stand" width="820">
+</p>
+
 Recognition isn't recall. You can recognize an answer when you see it and still not be able to pull it from memory unprompted. Learn-it is built for the second kind of knowing: it generates a personalized learning path, then drives you through proven cognitive-science methods, from spaced repetition (FSRS) and active recall to Feynman, Bloom depth, and the Dreyfus skill ladder, until knowledge actually lands in long-term memory.
 
 It's driven by an AI through the `/learn-it` skill. The AI diagnoses you, teaches, and grades; a thin Bun CLI is the engine it calls, logging only what you demonstrate.

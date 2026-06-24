@@ -8,6 +8,10 @@
 
 <!-- README-I18N:END -->
 
+<p align="center">
+  <img src="diag-teaser.gif" alt="learn-it diagnostiziert dich Konzept für Konzept, bewertet jedes einzelne und schreibt eine kalibrierte Standortbestimmung" width="820">
+</p>
+
 Wiedererkennen ist nicht dasselbe wie Abrufen. Du kannst eine Antwort wiedererkennen, wenn du sie siehst, und sie trotzdem nicht ohne Hinweise aus dem Gedächtnis hervorholen. Learn-it ist für die zweite Art des Wissens gemacht: Es erzeugt einen personalisierten Lernpfad und führt dich dann durch bewährte Methoden der Kognitionswissenschaft - verteilte Wiederholung (FSRS), aktives Abrufen, Feynman, Bloom-Tiefe und die Dreyfus-Kompetenzleiter - bis Wissen wirklich im Langzeitgedächtnis ankommt.
 
 Gesteuert wird es von einer KI über die Fähigkeit `/learn-it`. Die KI diagnostiziert dich, lehrt und bewertet; eine schlanke Bun-CLI ist die Engine, die sie aufruft und die nur das protokolliert, was du tatsächlich nachweist.

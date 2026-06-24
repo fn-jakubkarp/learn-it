@@ -8,6 +8,10 @@
 
 <!-- README-I18N:END -->
 
+<p align="center">
+  <img src="diag-teaser.gif" alt="learn-it te diagnostica concepto por concepto, califica cada uno y escribe un informe calibrado de dónde te encuentras" width="820">
+</p>
+
 Reconocer no es recordar. Puedes reconocer una respuesta cuando la ves y, aun así, no ser capaz de recuperarla de la memoria sin pistas. Learn-it está hecho para el segundo tipo de saber: genera una ruta de aprendizaje personalizada y luego te guía a través de métodos probados de la ciencia cognitiva -repetición espaciada (FSRS), recuerdo activo, Feynman, profundidad de Bloom y la escalera de habilidad de Dreyfus- hasta que el conocimiento realmente se asienta en la memoria a largo plazo.
 
 Lo dirige una IA mediante la habilidad `/learn-it`. La IA te diagnostica, te enseña y te califica; una CLI ligera en Bun es el motor que invoca y solo registra lo que de verdad demuestras.

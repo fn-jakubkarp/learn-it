@@ -8,6 +8,10 @@
 
 <!-- README-I18N:END -->
 
+<p align="center">
+  <img src="diag-teaser.gif" alt="learn-it diagnozuje cię koncept po koncepcie, ocenia każdy z nich i zapisuje skalibrowany raport o tym, na jakim jesteś poziomie" width="820">
+</p>
+
 Rozpoznanie to nie to samo co przypomnienie. Możesz rozpoznać odpowiedź, gdy ją widzisz, a mimo to nie potrafić wydobyć jej z pamięci bez podpowiedzi. Learn-it jest stworzony dla tego drugiego rodzaju wiedzy: generuje spersonalizowaną ścieżkę nauki, a następnie prowadzi cię przez sprawdzone metody z nauk kognitywnych - powtórki rozłożone w czasie (FSRS), aktywne przypominanie, technikę Feynmana, głębię taksonomii Blooma i drabinę umiejętności Dreyfusa - aż wiedza naprawdę osiądzie w pamięci długotrwałej.
 
 Steruje nim AI poprzez umiejętność `/learn-it`. AI diagnozuje cię, uczy i ocenia; lekkie CLI w Bun jest silnikiem, który wywołuje, zapisując tylko to, co faktycznie wykażesz.
