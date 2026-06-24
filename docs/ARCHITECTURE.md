@@ -162,7 +162,7 @@ diagnose → conceptualize → recall → space → verify → mastered
 - **Inferred phase.** Roadmap mapped? concepts *probed*? cards? reviews? applied evidence? → the phase follows. Diagnose is left behind by **demonstration** (a real probe), never by a hand-typed audit.
 - **Many subjects at once**, each at its own phase. The review queue interleaves due cards across all of them.
 
-Stages live as prompts in `stages/*.md`; the skill router is `skills/learn-it/SKILL.md` (symlinked into `.claude/skills/learn-it/` for project-skill discovery, and packaged as a plugin via `.claude-plugin/plugin.json`).
+Stages live as prompts in `stages/*.md`; the canonical skill router is `.agents/skills/learn-it/SKILL.md` (symlinked into each supported CLI's skills dir — e.g. `.claude/skills/learn-it/` — and packaged as a plugin via `.claude-plugin/plugin.json`).
 
 ## Diagnose before you teach
 
