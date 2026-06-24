@@ -66,8 +66,8 @@ bun run verify              # optional: biome + tsc + bun test
 
 ```
 /learn-it                   # dashboard across all subjects + the command menu
-/learn-it init rust         # start a subject (fill its audit.md)
-/learn-it plan rust         # turn the audit into a roadmap of concepts
+/learn-it init rust         # start a subject (just your goal — no self-inventory)
+/learn-it explore-gaps rust # the diagnostic: it tests you and places you, you don't self-report
 /learn-it reinforce         # the daily loop: spaced, varied re-exposure of due concepts
 ```
 
@@ -80,9 +80,9 @@ bun run verify              # optional: biome + tsc + bun test
 | 段階 | 何をするか |
 | --- | --- |
 | `/learn-it` | ダッシュボードを起動し、すべての科目の状態とコマンドメニューを表示します。 |
-| `init {subject}` | 科目の雛形を作成し、記入用に `audit.md` を開きます。 |
-| `explore-topic {subject}` | 候補となる概念マップを下書きして登録します。 |
-| `explore-gaps {subject}` | 概念を一つずつ探り、あなたを実際のレベルに位置づけ、`target` を設定します。 |
+| `init {subject} [slug]` | 科目の雛形を作成し、あなたの**目標**（理由 + 到達目標）を記録します。短い ascii の **slug**（例：`egzamin-krotkofalowca-klasa-1`）を割り当てます——これは後続コマンドに渡す、安定したクォート安全な id です（フルネームも使えます）。自己申告は不要——位置づけは宣言ではなく測定されます。 |
+| `explore-topic {subject}` | 領域**全体**を概念にマッピングして登録します——カバレッジはあなたの記憶ではなくその分野から得られるため、名前すら挙がらなかった抜けも地図に載ります。 |
+| `explore-gaps {subject}` | 概念を一つずつ探ります（自由再生ではなく手がかりに反応する）。各ギャップで一行の要点を教え、あなたが実際にどこにいるかを 🟢/🟡/🔴 で示す読み取りを書きます。`target` を設定します。 |
 | `plan {subject}` | 探りの結果とマップをすり合わせ、基礎優先で並べます。 |
 
 **学習と定着**
@@ -130,7 +130,7 @@ bun src/dashboard.ts        # → http://localhost:4321
 
 **二つの階層。** *科目（subject）*はあなたが習得する対象（例：「Rust」）で、ロードマップ、フェーズ、Dreyfus 段階を担います。*概念（concept）*はその下にあるレッスンサイズの葉（例：「ownership」）で、カードはここに紐づきます。ロードマップは概念のリストであり、習熟度はそこから積み上がります--単一の事実で「エキスパート」にはなれません。
 
-**フェーズは地図であって、線路ではありません。** Learn-it はあなたの実際の状態（監査は記入済みか？概念は計画済みか？カードは復習済みか？）を読み、各科目がどこにあるかを推論します。何もブロックされません。
+**フェーズは地図であって、線路ではありません。** Learn-it はあなたの実際の状態（概念はマッピング済みか？*探り済みか*？カードは復習済みか？）を読み、各科目がどこにあるかを推論します——diagnose は、あなたが試されたときに後にされるのであって、フォームに記入したときではありません。何もブロックされません。
 
 ```
 diagnose → conceptualize → recall → space → verify → mastered

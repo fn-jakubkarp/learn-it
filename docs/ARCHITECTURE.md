@@ -48,17 +48,17 @@ diagnose → conceptualize → recall → space → verify → mastered
 ```
 
 - **Any stage on demand.** Nothing is blocked; the watcher nudges when you jump ahead.
-- **Inferred phase.** Audit filled? concepts planned? cards? reviews? applied evidence? → the phase follows.
+- **Inferred phase.** Roadmap mapped? concepts *probed*? cards? reviews? applied evidence? → the phase follows. Diagnose is left behind by **demonstration** (a real probe), never by a hand-typed audit.
 - **Many subjects at once**, each at its own phase. The review queue interleaves due cards across all of them.
 
 Stages live as prompts in `stages/*.md`; the skill router is `skills/learn-it/SKILL.md` (symlinked into `.claude/skills/learn-it/` for project-skill discovery, and packaged as a plugin via `.claude-plugin/plugin.json`).
 
 ## Diagnose before you teach
 
-A learner can't list what they don't know, and an experienced one shouldn't start at novice. So after `init`:
+A learner can't list what they don't know, and an experienced one shouldn't start at novice — so the tool never asks them to. `init` captures only the **goal** (why + target tier); it does not collect a self-inventory. Then:
 
-1. **explore-topic** — map the subject into concepts (`addconcept`).
-2. **explore-gaps** — *test* the learner across the map (`probe`), placing them at their real level. Placement is **earned** (logged evidence), never declared; a single session reaches at most **proficient**.
+1. **explore-topic** — map the *full* territory into concepts (`addconcept`), foundation to edge, independent of what the learner can recall — so gaps they could never have named are still on the map.
+2. **explore-gaps** — *test* the learner across the map (`probe`), one concept at a time, react-to-cue not free-recall, teaching a one-line gist at each fall-off. This separates the three things that matter — what they can do (🟢), what they think they know but can't (🟡), what they never knew existed (🔴) — and writes that readout into `audit.md`. Placement is **earned** (logged evidence), never declared; a single session reaches at most **proficient**.
 
 Set a `target` tier so the watcher focuses on the gap between where the learner is and where they want to be.
 

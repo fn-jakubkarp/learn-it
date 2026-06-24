@@ -66,8 +66,8 @@ Open your agentic CLI **inside the repo** (the engine runs with the repo root as
 
 ```
 /learn-it                   # dashboard across all subjects + the command menu
-/learn-it init rust         # start a subject (fill its audit.md)
-/learn-it plan rust         # turn the audit into a roadmap of concepts
+/learn-it init rust         # start a subject (just your goal — no self-inventory)
+/learn-it explore-gaps rust # the diagnostic: it tests you and places you, you don't self-report
 /learn-it reinforce         # the daily loop: spaced, varied re-exposure of due concepts
 ```
 
@@ -80,9 +80,9 @@ Every stage runs on demand. Nothing is blocked. `[subject]` is optional (acts ac
 | Stage | What it does |
 | --- | --- |
 | `/learn-it` | Launch the dashboard, then print state + the command menu across all subjects. |
-| `init {subject}` | Scaffold the subject and open `audit.md` for you to fill. |
-| `explore-topic {subject}` | Draft a candidate concept map and register it. |
-| `explore-gaps {subject}` | Probe one concept at a time, place you at your real level, and set a `target`. |
+| `init {subject} [slug]` | Scaffold the subject and capture your **goal** (why + target). Assigns a short, ascii **slug** (e.g. `egzamin-krotkofalowca-klasa-1`) — the stable, quote-safe id you pass to later commands (the full name works too). No self-inventory — placement is measured, not declared. |
+| `explore-topic {subject}` | Map the **full** territory into concepts and register it — coverage comes from the field, not your recall, so unnamed gaps still land on the map. |
+| `explore-gaps {subject}` | Probe one concept at a time (react to a cue, not free-recall), teach a one-line gist at each gap, and write a 🟢/🟡/🔴 readout of where you actually stand. Sets a `target`. |
 | `plan {subject}` | Reconcile the map with probe findings; order it foundation-first. |
 
 **Learn & anchor**
@@ -130,7 +130,7 @@ bun src/dashboard.ts        # → http://localhost:4321
 
 **Two tiers.** A *subject* is the thing you master (e.g. "Rust") and carries the roadmap, phase, and Dreyfus tier. A *concept* is a lesson-sized leaf under it (e.g. "ownership"); cards attach there. The roadmap is the concept list, and mastery rolls up from it. You can't be an "expert" in a single fact.
 
-**Phases are a map, not a railroad.** Learn-it reads your real state (audit filled? concepts planned? cards reviewed?) to infer where each subject sits. Nothing is blocked.
+**Phases are a map, not a railroad.** Learn-it reads your real state (concepts mapped? *probed*? cards reviewed?) to infer where each subject sits — diagnose is left behind when you've been tested, never when you've filled in a form. Nothing is blocked.
 
 ```
 diagnose → conceptualize → recall → space → verify → mastered

@@ -66,8 +66,8 @@ Abre tu CLI agéntica **dentro del repositorio** -el motor se ejecuta con la ra�
 
 ```
 /learn-it                   # dashboard across all subjects + the command menu
-/learn-it init rust         # start a subject (fill its audit.md)
-/learn-it plan rust         # turn the audit into a roadmap of concepts
+/learn-it init rust         # start a subject (just your goal — no self-inventory)
+/learn-it explore-gaps rust # the diagnostic: it tests you and places you, you don't self-report
 /learn-it reinforce         # the daily loop: spaced, varied re-exposure of due concepts
 ```
 
@@ -80,9 +80,9 @@ Cada etapa se ejecuta a demanda; nada está bloqueado. `[subject]` es opcional (
 | Etapa | Qué hace |
 | --- | --- |
 | `/learn-it` | Lanza el panel y luego imprime el estado y el menú de comandos de todas las materias. |
-| `init {subject}` | Crea el andamiaje de la materia y abre `audit.md` para que lo rellenes. |
-| `explore-topic {subject}` | Esboza un mapa de conceptos candidato y lo registra. |
-| `explore-gaps {subject}` | Sondea un concepto a la vez, te sitúa en tu nivel real y fija un `target`. |
+| `init {subject} [slug]` | Crea el andamiaje de la materia y captura tu **objetivo** (por qué + meta). Asigna un **slug** corto y ascii (p. ej. `egzamin-krotkofalowca-klasa-1`) — el id estable y seguro entre comillas que pasas a los comandos posteriores (el nombre completo también funciona). Sin autoinventario: la ubicación se mide, no se declara. |
+| `explore-topic {subject}` | Mapea **todo** el territorio en conceptos y lo registra — la cobertura viene del campo, no de tu memoria, así que los huecos sin nombrar también caen en el mapa. |
+| `explore-gaps {subject}` | Sondea un concepto a la vez (reaccionas a una señal, no recuerdas en libre), enseña una idea de una línea en cada hueco y escribe un informe 🟢/🟡/🔴 de dónde estás realmente. Fija un `target`. |
 | `plan {subject}` | Concilia el mapa con los hallazgos del sondeo; lo ordena de los cimientos hacia arriba. |
 
 **Aprender y anclar**
@@ -130,7 +130,7 @@ bun src/dashboard.ts        # → http://localhost:4321
 
 **Dos niveles.** Una *materia (subject)* es lo que dominas (p. ej. «Rust») y lleva la ruta, la fase y el nivel de Dreyfus. Un *concepto (concept)* es una hoja del tamaño de una lección debajo de ella (p. ej. «ownership»); las tarjetas se enganchan ahí. La ruta es la lista de conceptos, y el dominio se agrega a partir de ella: no puedes ser «experto» en un solo dato.
 
-**Las fases son un mapa, no una vía férrea.** Learn-it lee tu estado real (¿auditoría rellenada? ¿conceptos planificados? ¿tarjetas repasadas?) para inferir dónde se sitúa cada materia. Nada está bloqueado.
+**Las fases son un mapa, no una vía férrea.** Learn-it lee tu estado real (¿conceptos mapeados? ¿*sondeados*? ¿tarjetas repasadas?) para inferir dónde se sitúa cada materia — diagnose se deja atrás cuando te han examinado, nunca cuando has rellenado un formulario. Nada está bloqueado.
 
 ```
 diagnose → conceptualize → recall → space → verify → mastered

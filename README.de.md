@@ -66,8 +66,8 @@ bun run verify              # optional: biome + tsc + bun test
 
 ```
 /learn-it                   # dashboard across all subjects + the command menu
-/learn-it init rust         # start a subject (fill its audit.md)
-/learn-it plan rust         # turn the audit into a roadmap of concepts
+/learn-it init rust         # start a subject (just your goal — no self-inventory)
+/learn-it explore-gaps rust # the diagnostic: it tests you and places you, you don't self-report
 /learn-it reinforce         # the daily loop: spaced, varied re-exposure of due concepts
 ```
 
@@ -80,9 +80,9 @@ Jede Stufe läuft auf Abruf - nichts ist blockiert. `[subject]` ist optional (wi
 | Stufe | Was sie tut |
 | --- | --- |
 | `/learn-it` | Startet das Dashboard und gibt dann Zustand und Befehlsmenü über alle Fächer aus. |
-| `init {subject}` | Legt das Gerüst des Fachs an und öffnet `audit.md` zum Ausfüllen. |
-| `explore-topic {subject}` | Entwirft eine Kandidaten-Konzeptkarte und registriert sie. |
-| `explore-gaps {subject}` | Sondiert ein Konzept nach dem anderen, ordnet dich deinem tatsächlichen Niveau zu und setzt ein `target`. |
+| `init {subject} [slug]` | Legt das Gerüst des Fachs an und erfasst dein **Ziel** (Warum + Zielwert). Vergibt einen kurzen, ascii **Slug** (z. B. `egzamin-krotkofalowca-klasa-1`) — die stabile, anführungssichere ID, die du an spätere Befehle übergibst (der volle Name funktioniert ebenfalls). Keine Selbstauskunft — die Einstufung wird gemessen, nicht erklärt. |
+| `explore-topic {subject}` | Kartiert das **gesamte** Gebiet in Konzepte und registriert es — die Abdeckung stammt aus dem Fachgebiet, nicht aus deiner Erinnerung, sodass auch unbenannte Lücken auf der Karte landen. |
+| `explore-gaps {subject}` | Sondiert ein Konzept nach dem anderen (reagiere auf einen Reiz, kein freies Erinnern), vermittelt an jeder Lücke einen einzeiligen Kerngedanken und schreibt einen 🟢/🟡/🔴-Bericht, wo du tatsächlich stehst. Setzt ein `target`. |
 | `plan {subject}` | Gleicht die Karte mit den Sondierungsbefunden ab; ordnet sie fundamentzuerst. |
 
 **Lernen & verankern**
@@ -130,7 +130,7 @@ bun src/dashboard.ts        # → http://localhost:4321
 
 **Zwei Ebenen.** Ein *Fach (subject)* ist das, was du beherrschst (z. B. „Rust“), und trägt die Roadmap, die Phase und die Dreyfus-Stufe. Ein *Konzept (concept)* ist ein lektionsgroßes Blatt darunter (z. B. „ownership“); Karten hängen sich hier an. Die Roadmap ist die Konzeptliste, und die Beherrschung aggregiert sich aus ihr - in einem einzelnen Fakt kannst du kein „Experte“ sein.
 
-**Phasen sind eine Landkarte, keine Eisenbahnschiene.** Learn-it liest deinen realen Zustand (Audit ausgefüllt? Konzepte geplant? Karten wiederholt?), um abzuleiten, wo jedes Fach steht. Nichts ist blockiert.
+**Phasen sind eine Landkarte, keine Eisenbahnschiene.** Learn-it liest deinen realen Zustand (Konzepte kartiert? *sondiert*? Karten wiederholt?), um abzuleiten, wo jedes Fach steht — diagnose wird zurückgelassen, wenn du geprüft wurdest, nie wenn du ein Formular ausgefüllt hast. Nichts ist blockiert.
 
 ```
 diagnose → conceptualize → recall → space → verify → mastered
