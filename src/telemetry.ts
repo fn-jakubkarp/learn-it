@@ -109,22 +109,16 @@ async function track(event: string, command: string): Promise<void> {
 			fetchRetryCount: 0,
 			requestTimeout: 3000,
 		});
-		try {
-			await client.captureImmediate({
-				distinctId,
-				event,
-				properties: {
-					command,
-					app_version: appVersion(),
-					os: process.platform,
-				},
-			});
-		} finally {
-			// Always tear the client down — its flush timers would otherwise leak
-			// (notably on the long-lived dashboard, which sends in-process). Async,
-			// so await it; a shutdown failure falls through to the outer swallow.
-			await client.shutdown();
-		}
+		await client.captureImmediate({
+			distinctId,
+			event,
+			properties: {
+				command,
+				app_version: appVersion(),
+				os: process.platform,
+			},
+		});
+		client.shutdown();
 	} catch {
 		// offline, blocked egress, bad key — never surface to the user.
 	}
