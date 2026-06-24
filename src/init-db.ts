@@ -255,7 +255,9 @@ export function initDb(dataDir: string = DEFAULT_DATA_DIR): string {
 	// CLI, where the working directory is correct — not here.
 	ensureColumn("subjects", "slug", "TEXT");
 	const unslugged = db
-		.query("SELECT id, name FROM subjects WHERE slug IS NULL OR slug = ''")
+		.query(
+			"SELECT id, name FROM subjects WHERE slug IS NULL OR slug = '' ORDER BY id",
+		)
 		.all() as { id: number; name: string }[];
 	if (unslugged.length) {
 		const used = new Set(
