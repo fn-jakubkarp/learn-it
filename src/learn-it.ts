@@ -1333,7 +1333,7 @@ function main() {
 main();
 
 // Anonymous adoption telemetry: the command VERB only, never argv (args carry
-// subject/concept names = learning content). Fire-and-flush after the command so
-// it never delays output; the pending request keeps the process alive until it
-// ships, and the whole thing no-ops unless a real PostHog key is configured.
-void trackCommand(command);
+// subject/concept names = learning content). Dispatched off-process (a detached,
+// unref'd child does the network send), so it never delays the command's exit, and
+// the whole thing no-ops unless a real PostHog key is configured.
+trackCommand(command);

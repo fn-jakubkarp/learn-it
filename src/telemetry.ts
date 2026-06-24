@@ -88,14 +88,13 @@ function appVersion(): string {
 	}
 }
 
-// Capture one event and flush before the (short-lived) process exits. posthog-node
+// PRIVATE sender — the single egress point. Ships EXACTLY the allowlisted fields:
+// the event name + command verb + app version + OS, keyed by the anonymous install
+// id. Nothing else is accepted, so no caller can widen what's captured. posthog-node
 // is imported lazily so disabled installs never pay to load it; captureImmediate
-// sends synchronously and resolves, then shutdown clears timers so the process can
-// exit clean. Any failure is swallowed — telemetry is never load-bearing.
-export async function track(
-	event: string,
-	properties: Record<string, unknown> = {},
-): Promise<void> {
+// sends and resolves, then shutdown clears timers. Any failure is swallowed —
+// telemetry is never load-bearing.
+async function track(event: string, command: string): Promise<void> {
 	if (!telemetryEnabled()) return;
 	const distinctId = telemetryId();
 	if (!distinctId) return;
@@ -105,9 +104,8 @@ export async function track(
 			host: POSTHOG_HOST,
 			flushAt: 1,
 			flushInterval: 0,
-			// An interactive CLI runs this on every command — an offline or
-			// firewalled user must not eat the default ~30s retry/backoff. One
-			// attempt, hard 3s ceiling, then give up silently.
+			// An offline or firewalled user must not eat the default ~30s
+			// retry/backoff. One attempt, hard 3s ceiling, then give up silently.
 			fetchRetryCount: 0,
 			requestTimeout: 3000,
 		});
@@ -115,10 +113,9 @@ export async function track(
 			distinctId,
 			event,
 			properties: {
-				...properties,
+				command,
 				app_version: appVersion(),
 				os: process.platform,
-				runtime: "bun",
 			},
 		});
 		client.shutdown();
@@ -127,8 +124,34 @@ export async function track(
 	}
 }
 
-// Convenience for the CLI router: record a command verb. Takes ONLY the verb,
-// never argv — args carry subject/concept names, which are learning content.
-export async function trackCommand(command: string | undefined): Promise<void> {
-	await track("cli_command", { command: command ?? "resume" });
+// Typed helper for the CLI router: record a command VERB (never argv — args carry
+// subject/concept names = learning content). Dispatched OFF-PROCESS so it can never
+// add latency: we create the id + print the one-time notice synchronously here, then
+// hand the network send to a detached, unref'd child and return immediately. The CLI
+// (and any dashboard spawnSync wrapping it) exits without waiting on the network.
+export function trackCommand(command: string | undefined): void {
+	if (!telemetryEnabled()) return;
+	if (!telemetryId()) return;
+	try {
+		Bun.spawn(
+			[process.execPath, import.meta.path, "send", command ?? "resume"],
+			{ stdin: "ignore", stdout: "ignore", stderr: "ignore" },
+		).unref();
+	} catch {
+		// spawn failed — telemetry is best-effort, never load-bearing.
+	}
+}
+
+// Typed helper for the long-lived dashboard server: record that the web UI was
+// opened. Fire-and-forget in-process (the server isn't exiting, so there's nothing
+// to delay); no-ops when telemetry is disabled.
+export function trackDashboardOpen(): void {
+	void track("dashboard_open", "dashboard");
+}
+
+// Detached sender entry: `bun src/telemetry.ts send <verb>` performs the real
+// network send in its own process (spawned by trackCommand) and exits when done.
+if (import.meta.main) {
+	const [mode, verb] = process.argv.slice(2);
+	if (mode === "send") void track("cli_command", verb ?? "resume");
 }
