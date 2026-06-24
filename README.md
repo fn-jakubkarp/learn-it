@@ -162,7 +162,7 @@ The one rule: the engine writes *State*, reads *Knowledge*, and never edits a fi
 | `src/init-db.ts` | Creates / migrates the SQLite schema. |
 | `src/dashboard.ts` | Build-free local web dashboard. |
 
-See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full design.
+See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full design — including a diagram of the whole flow.
 
 ## Acknowledgements
 

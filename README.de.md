@@ -162,7 +162,7 @@ Die eine Regel: Die Engine schreibt den *Zustand*, liest das *Wissen* und bearbe
 | `src/init-db.ts` | Erstellt / migriert das SQLite-Schema. |
 | `src/dashboard.ts` | Build-freies lokales Web-Dashboard. |
 
-Das vollständige Design findest du in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+Das vollständige Design — samt einem Diagramm des gesamten Ablaufs — findest du in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ## Danksagungen
 

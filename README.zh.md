@@ -162,7 +162,7 @@ diagnose → conceptualize → recall → space → verify → mastered
 | `src/init-db.ts` | 创建 / 迁移 SQLite 架构。 |
 | `src/dashboard.ts` | 免构建的本地 Web 仪表盘。 |
 
-完整设计参见 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)。
+完整设计（含整个流程的图示）参见 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)。
 
 ## 致谢
 

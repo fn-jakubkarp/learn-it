@@ -2,6 +2,117 @@
 
 learn-it is an AI learning pipeline built on cognitive science: spaced repetition (FSRS), active recall, the Feynman technique, Bloom's depth levels, and the Dreyfus skill-acquisition ladder. The agent is a **mentor with tools**, not a course on rails.
 
+## System at a glance
+
+The whole flow, phase by phase — diagnose what you really know, learn it, keep it alive with spaced recall, then prove it. The watcher reads what actually happened; the dashboard is a live read-only view. State (tier, phase) is computed from logs, never declared.
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant L as Learner
+  participant M as Mentor (learn-it)
+  participant E as Engine (logs + files)
+  participant D as Dashboard (web)
+
+  rect rgba(100, 149, 237, 0.5)
+    note over L,D: DIAGNOSE — placement is measured, never declared
+
+    note over L,M: init
+    L->>M: my goal (why + how far)
+    M->>E: create subject, save goal + target tier
+
+    note over L,M: explore-topic
+    M->>E: map the WHOLE field, foundation to edge
+    M->>E: register each concept (independent of recall)
+
+    note over L,M: explore-gaps
+    loop one concept at a time
+      M->>L: recognition cue + one question
+      L-->>M: answer
+      alt correct
+        M->>L: climb — mechanism, trade-off, apply
+      else falls off
+        M->>L: one-line gist, mark the gap
+      end
+      M->>E: score refute-first vs rubric (grader pinned)
+      M->>E: mark 🟢 known / 🟡 shaky / 🔴 blank
+    end
+    M-->>L: 🟢 / 🟡 / 🔴 readout written into audit.md
+
+    note over L,M: plan
+    M->>E: reconcile map vs probes, order foundation-first
+    note over M,E: phase leaves DIAGNOSE only after<br/>roadmap built + at least one concept probed
+  end
+
+  rect rgba(144, 238, 144, 0.5)
+    note over L,D: LEARN — build understanding
+
+    note over L,M: concept
+    M->>L: teach by analogy + mechanism
+    L->>E: re-explain in your own words → notes.md
+
+    note over L,M: anchor
+    M->>L: mnemonics for raw facts (syntax, names, dates)
+
+    note over L,M: extract
+    L->>E: turn notes into flashcards
+  end
+
+  rect rgba(255, 198, 88, 0.5)
+    note over L,D: KEEP ALIVE — spacing lives on the concept
+
+    loop reinforce — daily, weakest + most overdue first
+      E-->>M: next concept due
+      M->>L: explain / quiz / card / re-read
+      L-->>M: recall
+      alt retrieval (explain · quiz · card)
+        M->>E: full credit — can prove the concept
+      else recognition (re-read)
+        M->>E: capped — keeps it warm, never proves
+      end
+      M->>E: advance FSRS clock, log real elapsed days
+    end
+    M->>E: session note — next session resumes with context
+  end
+
+  rect rgba(72, 201, 207, 0.4)
+    note over L,D: DASHBOARD — live, read-only companion (open anytime)
+    L->>D: open localhost:4321
+    D->>E: read full state (export)
+    D-->>L: subjects · phases · due queue · flashcards
+    opt self-graded card practice
+      L->>D: grade a card
+      D->>E: log review (grader = dashboard)
+    end
+    note over E,D: each request re-reads the db — always live<br/>writes still flow through the same CLI
+  end
+
+  rect rgba(186, 148, 255, 0.45)
+    note over L,D: PROVE — earn the tier with real evidence
+
+    note over L,M: assess
+    M->>L: structured task from a fixed template<br/>(explain / apply / build) aimed at the weakest gap
+    L-->>M: deliverable
+
+    note over L,M: evaluate
+    M->>E: score vs fixed rubric (≥ 70 passes)
+    opt tier-promoting evidence
+      M->>E: grade twice independently, record the lower
+    end
+    M->>E: append evidence (grader pinned)
+
+    opt exam
+      M->>L: brand-new problem → apply evidence
+    end
+  end
+
+  rect rgba(255, 215, 0, 0.4)
+    note over L,D: MASTERED — harsh, earned, un-gameable
+    note over L,E: rolls up from append-only reviews + evidence<br/>medium-agnostic · volume never lifts a tier<br/>one diagnosis caps at proficient<br/>expert needs a real BUILD + durability
+    E-->>L: Dreyfus tier — computed from logs, never declared
+  end
+```
+
 ## 2-tier structure: subjects → concepts
 
 "Topic" is two different sizes of thing, so they're split:

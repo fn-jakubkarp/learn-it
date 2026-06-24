@@ -162,7 +162,7 @@ diagnose → conceptualize → recall → space → verify → mastered
 | `src/init-db.ts` | SQLite スキーマを作成／移行する。 |
 | `src/dashboard.ts` | ビルド不要のローカル Web ダッシュボード。 |
 
-完全な設計は [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) を参照してください。
+全体の流れを示す図を含む完全な設計は [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) を参照してください。
 
 ## 謝辞
 
