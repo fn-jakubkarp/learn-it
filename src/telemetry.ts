@@ -62,11 +62,20 @@ export function telemetryEnabled(): boolean {
 	return !isTelemetryDisabled(process.env, POSTHOG_KEY);
 }
 
+const UUID_RE =
+	/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 // The stable per-install anonymous id, created (with the one-time notice) on first
 // use. Returns null if it can't be persisted — telemetry then quietly no-ops.
 export function telemetryId(): string | null {
 	try {
-		if (fs.existsSync(ID_FILE)) return fs.readFileSync(ID_FILE, "utf8").trim();
+		if (fs.existsSync(ID_FILE)) {
+			const existing = fs.readFileSync(ID_FILE, "utf8").trim();
+			// Reuse only a well-formed id — a corrupted or hand-edited value (empty,
+			// multi-line, arbitrary text) must not ride out as the distinctId; fall
+			// through and regenerate instead.
+			if (UUID_RE.test(existing)) return existing;
+		}
 		if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 		const id = crypto.randomUUID();
 		fs.writeFileSync(ID_FILE, id);
