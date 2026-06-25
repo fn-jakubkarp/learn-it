@@ -1,14 +1,47 @@
 # Learn-it
 
-> Eine KI-Lernpipeline, die bleibendes Wissen aufbaut - verteilte Wiederholung, aktives Abrufen und ein Beherrschungswert, den du nicht fälschen kannst.
-
 <!-- README-I18N:START -->
 
-[English](./README.md) | [中文](./README.zh.md) | [Español](./README.es.md) | [Polski](./README.pl.md) | [日本語](./README.ja.md) | **Deutsch**
+[English](README.md) | [中文](README.zh.md) | [Español](README.es.md) | [Polski](README.pl.md) | [日本語](README.ja.md) | **Deutsch**
 
 <!-- README-I18N:END -->
 
-Wiedererkennen ist nicht dasselbe wie Abrufen. Du kannst eine Antwort wiedererkennen, wenn du sie siehst, und sie trotzdem nicht ohne Hinweise aus dem Gedächtnis hervorholen. Learn-it ist für die zweite Art des Wissens gemacht: Es erzeugt einen personalisierten Lernpfad und führt dich dann durch bewährte Methoden der Kognitionswissenschaft - verteilte Wiederholung (FSRS), aktives Abrufen, Feynman, Bloom-Tiefe und die Dreyfus-Kompetenzleiter - bis Wissen wirklich im Langzeitgedächtnis ankommt.
+<p align="center">
+  <img src="docs/social-preview.png" alt="Learn-it — ein Beherrschungswert, den du nicht fälschen kannst" width="800">
+</p>
+
+<p align="center">
+  <em>Die meisten Lern-Apps belohnen dich fürs Wiedererkennen der richtigen Antwort. Wiedererkennen ist nicht Erinnern.</em><br>
+  <strong>Learn-it führt dich durch bewährte Methoden der Kognitionswissenschaft, bis Wissen sitzt — und bewertet Können danach, was du <em>beweist</em>, nie nach dem, was du behauptest.</strong><br>
+  <em>Local-first. Open Source.</em>
+</p>
+
+<p align="center">
+  <a href="https://claude.com/claude-code"><img src="https://img.shields.io/badge/Built_with-Claude_Code-000?style=for-the-badge&logo=anthropic&logoColor=white" alt="Built with Claude Code"></a>
+</p>
+
+---
+
+<p align="center">
+  <img src="docs/diag-teaser.gif" alt="learn-it diagnostiziert dich Konzept für Konzept, bewertet jedes einzelne und schreibt eine kalibrierte Standortbestimmung" width="800">
+</p>
+
+<p align="center"><strong>Verteiltes Wiederholen · Aktives Abrufen · Bloom-Tiefe · Dreyfus-Stufen · Ein Beherrschungswert, den du nicht faken kannst</strong></p>
+
+<p align="center">
+  <sub>Läuft mit jeder CLI nach dem agent-skill-Standard</sub><br>
+  <img src="https://img.shields.io/badge/Claude_Code-000?style=flat&logo=anthropic&logoColor=white" alt="Claude Code">
+  <img src="https://img.shields.io/badge/OpenCode-111827?style=flat&logo=terminal&logoColor=white" alt="OpenCode">
+  <img src="https://img.shields.io/badge/Qwen_Code-615CED?style=flat" alt="Qwen Code">
+  <img src="https://img.shields.io/badge/Gemini_CLI-4285F4?style=flat&logo=googlegemini&logoColor=white" alt="Gemini CLI">
+  <br>
+  <a href="https://github.com/fn-jakubkarp/learn-it/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/fn-jakubkarp/learn-it/ci.yml?branch=main&label=CI&style=flat" alt="CI status"></a>
+  <a href="https://github.com/fn-jakubkarp/learn-it/releases/latest"><img src="https://img.shields.io/github/v/release/fn-jakubkarp/learn-it?sort=semver&style=flat&color=2ea44f&label=release" alt="Latest release"></a>
+  <img src="https://img.shields.io/github/last-commit/fn-jakubkarp/learn-it?style=flat" alt="Last commit">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue?style=flat" alt="MIT License"></a>
+</p>
+
+Du kannst eine Antwort wiedererkennen, wenn du sie siehst, und sie trotzdem nicht ohne Hinweise aus dem Gedächtnis hervorholen. Learn-it ist für die zweite Art des Wissens gemacht: Es erzeugt einen personalisierten Lernpfad und führt dich dann durch bewährte Methoden der Kognitionswissenschaft - verteilte Wiederholung (FSRS), aktives Abrufen, Feynman, Bloom-Tiefe und die Dreyfus-Kompetenzleiter - bis Wissen wirklich im Langzeitgedächtnis ankommt.
 
 Gesteuert wird es von einer KI über die Fähigkeit `/learn-it`. Die KI diagnostiziert dich, lehrt und bewertet; eine schlanke Bun-CLI ist die Engine, die sie aufruft und die nur das protokolliert, was du tatsächlich nachweist.
 
@@ -57,6 +90,31 @@ bun install
 bun src/init-db.ts          # create data/learn_it.db
 bun run verify              # optional: biome + tsc + bun test
 ```
+
+</details>
+
+<details>
+<summary>Ohne Telemetrie installieren</summary>
+
+Schreibe die Opt-out-Einstellung **vor dem ersten Start** — Bun lädt `.env` automatisch, sodass jeder Befehl von Anfang an deaktiviert ist (kein Erst-Start-Hinweis, es wird nie eine id erzeugt). `.env` ist in gitignore.
+
+**Linux / macOS**
+
+```bash
+git clone https://github.com/fn-jakubkarp/learn-it.git && cd learn-it
+echo "LEARN_IT_TELEMETRY=0" > .env
+bun install && bun src/init-db.ts
+```
+
+**Windows (PowerShell)**
+
+```powershell
+git clone https://github.com/fn-jakubkarp/learn-it.git; cd learn-it
+"LEARN_IT_TELEMETRY=0" | Out-File -Encoding ascii .env
+bun install; bun src/init-db.ts
+```
+
+Lieber ein systemweiter Schalter? `export DO_NOT_TRACK=1` deaktiviert die Telemetrie hier und in jedem anderen Tool, das [den Standard](https://consoledonottrack.com) respektiert.
 
 </details>
 
@@ -161,8 +219,17 @@ Die eine Regel: Die Engine schreibt den *Zustand*, liest das *Wissen* und bearbe
 | `src/mastery.ts` | Dreyfus-Stufen, aggregiert über Konzepte + Nachweise (Menge zählt nicht). |
 | `src/init-db.ts` | Erstellt / migriert das SQLite-Schema. |
 | `src/dashboard.ts` | Build-freies lokales Web-Dashboard. |
+| `src/telemetry.ts` | Anonyme, inhaltsfreie Nutzungstelemetrie (Opt-out). |
 
 Das vollständige Design — samt einem Diagramm des gesamten Ablaufs — findest du in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+
+## Telemetrie
+
+Learn-it sendet **anonyme, inhaltsfreie** Nutzungstelemetrie (PostHog), damit das Tool anhand der tatsächlich genutzten Befehle verbessert werden kann. Beim ersten Senden wird ein deutlicher einmaliger Hinweis ausgegeben.
+
+- **Was gesendet wird:** der ausgeführte Befehl (`grade`, `assess`, …), die App-Version, dein Betriebssystem und eine zufällige Id pro Installation. Das Dashboard wird nicht erfasst.
+- **Was nie gesendet wird:** Fachnamen, Konzeptnamen, Kartentext, Notizen, Bewertungen — *alles*, was du lernst. Das bleibt in `data/*.db` auf deinem Rechner und verlässt ihn nie.
+- **Jederzeit abschaltbar:** `export DO_NOT_TRACK=1` (der [werkzeugübergreifende Standard](https://consoledonottrack.com)) oder `export LEARN_IT_TELEMETRY=0`. CI-Läufe werden automatisch ausgeschlossen. Die anonyme Id liegt in `data/.telemetry-id` — löschen setzt sie zurück.
 
 ## Danksagungen
 

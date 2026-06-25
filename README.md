@@ -1,14 +1,47 @@
 # Learn-it
 
-> An AI learning pipeline that builds knowledge that lasts: spaced repetition, active recall, and a mastery score you can't fake.
-
 <!-- README-I18N:START -->
 
-**English** | [中文](./README.zh.md) | [Español](./README.es.md) | [Polski](./README.pl.md) | [日本語](./README.ja.md) | [Deutsch](./README.de.md)
+**English** | [中文](README.zh.md) | [Español](README.es.md) | [Polski](README.pl.md) | [日本語](README.ja.md) | [Deutsch](README.de.md)
 
 <!-- README-I18N:END -->
 
-Recognition isn't recall. You can recognize an answer when you see it and still not be able to pull it from memory unprompted. Learn-it is built for the second kind of knowing: it generates a personalized learning path, then drives you through proven cognitive-science methods, from spaced repetition (FSRS) and active recall to Feynman, Bloom depth, and the Dreyfus skill ladder, until knowledge actually lands in long-term memory.
+<p align="center">
+  <img src="docs/social-preview.png" alt="Learn-it — score mastery you can't fake" width="800">
+</p>
+
+<p align="center">
+  <em>Most study tools reward you for recognizing the right answer. Recognition isn't recall.</em><br>
+  <strong>Learn-it drives you through proven cognitive-science methods until knowledge sticks — and scores mastery from what you <em>prove</em>, never what you claim.</strong><br>
+  <em>Local-first. Open source.</em>
+</p>
+
+<p align="center">
+  <a href="https://claude.com/claude-code"><img src="https://img.shields.io/badge/Built_with-Claude_Code-000?style=for-the-badge&logo=anthropic&logoColor=white" alt="Built with Claude Code"></a>
+</p>
+
+---
+
+<p align="center">
+  <img src="docs/diag-teaser.gif" alt="learn-it diagnoses you concept by concept, grades each, and writes a calibrated readout of where you stand" width="800">
+</p>
+
+<p align="center"><strong>Spaced repetition · Active recall · Bloom depth · Dreyfus tiers · A mastery score you can't game</strong></p>
+
+<p align="center">
+  <sub>Driven by any agent-skill-standard CLI</sub><br>
+  <img src="https://img.shields.io/badge/Claude_Code-000?style=flat&logo=anthropic&logoColor=white" alt="Claude Code">
+  <img src="https://img.shields.io/badge/OpenCode-111827?style=flat&logo=terminal&logoColor=white" alt="OpenCode">
+  <img src="https://img.shields.io/badge/Qwen_Code-615CED?style=flat" alt="Qwen Code">
+  <img src="https://img.shields.io/badge/Gemini_CLI-4285F4?style=flat&logo=googlegemini&logoColor=white" alt="Gemini CLI">
+  <br>
+  <a href="https://github.com/fn-jakubkarp/learn-it/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/fn-jakubkarp/learn-it/ci.yml?branch=main&label=CI&style=flat" alt="CI status"></a>
+  <a href="https://github.com/fn-jakubkarp/learn-it/releases/latest"><img src="https://img.shields.io/github/v/release/fn-jakubkarp/learn-it?sort=semver&style=flat&color=2ea44f&label=release" alt="Latest release"></a>
+  <img src="https://img.shields.io/github/last-commit/fn-jakubkarp/learn-it?style=flat" alt="Last commit">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue?style=flat" alt="MIT License"></a>
+</p>
+
+You can recognize an answer when you see it and still not be able to pull it from memory unprompted. Learn-it is built for the second kind of knowing: it generates a personalized learning path, then drives you through proven cognitive-science methods, from spaced repetition (FSRS) and active recall to Feynman, Bloom depth, and the Dreyfus skill ladder, until knowledge actually lands in long-term memory.
 
 It's driven by an AI through the `/learn-it` skill. The AI diagnoses you, teaches, and grades; a thin Bun CLI is the engine it calls, logging only what you demonstrate.
 
@@ -57,6 +90,31 @@ bun install
 bun src/init-db.ts          # create data/learn_it.db
 bun run verify              # optional: biome + tsc + bun test
 ```
+
+</details>
+
+<details>
+<summary>Install without telemetry</summary>
+
+Write the opt-out **before the first run** — Bun auto-loads `.env`, so every command is disabled from the start (no first-run notice, no id ever created). `.env` is gitignored.
+
+**Linux / macOS**
+
+```bash
+git clone https://github.com/fn-jakubkarp/learn-it.git && cd learn-it
+echo "LEARN_IT_TELEMETRY=0" > .env
+bun install && bun src/init-db.ts
+```
+
+**Windows (PowerShell)**
+
+```powershell
+git clone https://github.com/fn-jakubkarp/learn-it.git; cd learn-it
+"LEARN_IT_TELEMETRY=0" | Out-File -Encoding ascii .env
+bun install; bun src/init-db.ts
+```
+
+Prefer a system-wide switch? `export DO_NOT_TRACK=1` opts out of this and any other tool that respects [the standard](https://consoledonottrack.com).
 
 </details>
 
@@ -161,8 +219,17 @@ The one rule: the engine writes *State*, reads *Knowledge*, and never edits a fi
 | `src/mastery.ts` | Dreyfus tiers, rolled up over concepts + evidence (no volume credit). |
 | `src/init-db.ts` | Creates / migrates the SQLite schema. |
 | `src/dashboard.ts` | Build-free local web dashboard. |
+| `src/telemetry.ts` | Anonymous, content-free adoption telemetry (opt-out). |
 
 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full design — including a diagram of the whole flow.
+
+## Telemetry
+
+Learn-it sends **anonymous, content-free** usage telemetry (PostHog) so the tool can be improved based on which commands people actually use. A loud one-time notice prints the first time anything is sent.
+
+- **What it sends:** the command you ran (`grade`, `assess`, …), the app version, your OS, and a random per-install id. The dashboard isn't tracked.
+- **What it never sends:** subject names, concept names, card text, notes, scores — *anything* you study. That stays in `data/*.db` on your machine and never leaves it.
+- **Opt out any time:** `export DO_NOT_TRACK=1` (the [cross-tool standard](https://consoledonottrack.com)) or `export LEARN_IT_TELEMETRY=0`. CI runs are excluded automatically. The anonymous id lives at `data/.telemetry-id` — delete it to reset.
 
 ## Acknowledgements
 

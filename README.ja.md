@@ -1,14 +1,47 @@
 # Learn-it
 
-> 知識を本当に定着させる AI 学習パイプライン--間隔反復、能動的想起、そしてごまかせない習熟度スコア。
-
 <!-- README-I18N:START -->
 
-[English](./README.md) | [中文](./README.zh.md) | [Español](./README.es.md) | [Polski](./README.pl.md) | **日本語** | [Deutsch](./README.de.md)
+[English](README.md) | [中文](README.zh.md) | [Español](README.es.md) | [Polski](README.pl.md) | **日本語** | [Deutsch](README.de.md)
 
 <!-- README-I18N:END -->
 
-再認は想起ではありません。答えを見れば「分かる」のに、手がかりなしに記憶から引き出せないことがあります。Learn-it は後者の「知っている」状態のために作られています。個別化された学習経路を生成し、実証済みの認知科学の手法--間隔反復（FSRS）、能動的想起、Feynman テクニック、Bloom の深さ、Dreyfus の技能ラダー--を通してあなたを導き、知識が本当に長期記憶へ定着するまで連れて行きます。
+<p align="center">
+  <img src="docs/social-preview.png" alt="Learn-it — ごまかせない習熟度スコア" width="800">
+</p>
+
+<p align="center">
+  <em>多くの学習ツールは「正解を見て分かる」ことを評価します。認識は想起ではありません。</em><br>
+  <strong>Learn-it は実証済みの認知科学の手法で知識が定着するまで導き、あなたが<em>証明</em>したことだけで習熟度を採点します。主張ではなく。</strong><br>
+  <em>ローカルファースト。オープンソース。</em>
+</p>
+
+<p align="center">
+  <a href="https://claude.com/claude-code"><img src="https://img.shields.io/badge/Built_with-Claude_Code-000?style=for-the-badge&logo=anthropic&logoColor=white" alt="Built with Claude Code"></a>
+</p>
+
+---
+
+<p align="center">
+  <img src="docs/diag-teaser.gif" alt="learn-it は概念ごとにあなたを診断し、それぞれを採点し、あなたの現在地を示す較正済みの結果を書き出します" width="800">
+</p>
+
+<p align="center"><strong>間隔反復 · 能動的想起 · ブルームの深さ · ドレイファスの段階 · ごまかせない習熟度スコア</strong></p>
+
+<p align="center">
+  <sub>agent-skill 標準に対応した任意の CLI で動作</sub><br>
+  <img src="https://img.shields.io/badge/Claude_Code-000?style=flat&logo=anthropic&logoColor=white" alt="Claude Code">
+  <img src="https://img.shields.io/badge/OpenCode-111827?style=flat&logo=terminal&logoColor=white" alt="OpenCode">
+  <img src="https://img.shields.io/badge/Qwen_Code-615CED?style=flat" alt="Qwen Code">
+  <img src="https://img.shields.io/badge/Gemini_CLI-4285F4?style=flat&logo=googlegemini&logoColor=white" alt="Gemini CLI">
+  <br>
+  <a href="https://github.com/fn-jakubkarp/learn-it/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/fn-jakubkarp/learn-it/ci.yml?branch=main&label=CI&style=flat" alt="CI status"></a>
+  <a href="https://github.com/fn-jakubkarp/learn-it/releases/latest"><img src="https://img.shields.io/github/v/release/fn-jakubkarp/learn-it?sort=semver&style=flat&color=2ea44f&label=release" alt="Latest release"></a>
+  <img src="https://img.shields.io/github/last-commit/fn-jakubkarp/learn-it?style=flat" alt="Last commit">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue?style=flat" alt="MIT License"></a>
+</p>
+
+答えを見れば「分かる」のに、手がかりなしに記憶から引き出せないことがあります。Learn-it は後者の「知っている」状態のために作られています。個別化された学習経路を生成し、実証済みの認知科学の手法--間隔反復（FSRS）、能動的想起、Feynman テクニック、Bloom の深さ、Dreyfus の技能ラダー--を通してあなたを導き、知識が本当に長期記憶へ定着するまで連れて行きます。
 
 `/learn-it` スキルを通じて AI が駆動します。AI が診断し、教え、採点します。軽量な Bun の CLI はそれが呼び出すエンジンであり、あなたが実際に示したことだけを記録します。
 
@@ -57,6 +90,31 @@ bun install
 bun src/init-db.ts          # create data/learn_it.db
 bun run verify              # optional: biome + tsc + bun test
 ```
+
+</details>
+
+<details>
+<summary>テレメトリなしでインストール</summary>
+
+**最初の実行より前に**オプトアウトを書き込みます。Bun は `.env` を自動で読み込むため、最初のコマンドからテレメトリは無効になります（初回通知も出ず、id も一切生成されません）。`.env` は gitignore 済みです。
+
+**Linux / macOS**
+
+```bash
+git clone https://github.com/fn-jakubkarp/learn-it.git && cd learn-it
+echo "LEARN_IT_TELEMETRY=0" > .env
+bun install && bun src/init-db.ts
+```
+
+**Windows (PowerShell)**
+
+```powershell
+git clone https://github.com/fn-jakubkarp/learn-it.git; cd learn-it
+"LEARN_IT_TELEMETRY=0" | Out-File -Encoding ascii .env
+bun install; bun src/init-db.ts
+```
+
+システム全体で切り替えたい場合は？`export DO_NOT_TRACK=1` で、本ツールと[この標準](https://consoledonottrack.com)に従う他のあらゆるツールからオプトアウトできます。
 
 </details>
 
@@ -161,8 +219,17 @@ diagnose → conceptualize → recall → space → verify → mastered
 | `src/mastery.ts` | Dreyfus 段階。概念＋証拠で積み上げる（量は加点しない）。 |
 | `src/init-db.ts` | SQLite スキーマを作成／移行する。 |
 | `src/dashboard.ts` | ビルド不要のローカル Web ダッシュボード。 |
+| `src/telemetry.ts` | 匿名・内容を含まない利用テレメトリ（オプトアウト可）。 |
 
 全体の流れを示す図を含む完全な設計は [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) を参照してください。
+
+## テレメトリ
+
+Learn-it は、実際に使われているコマンドに基づいてツールを改善するため、**匿名・内容を含まない**利用テレメトリ（PostHog）を送信します。何かを初めて送信する際に、目立つ一度きりの通知を表示します。
+
+- **送信する内容：** 実行したコマンド（`grade`、`assess` など）、アプリのバージョン、OS、インストールごとのランダムな id。ダッシュボードは追跡されません。
+- **決して送信しない内容：** 科目名、概念名、カードの本文、メモ、スコア — あなたが学ぶ*あらゆるもの*。これらはあなたのマシンの `data/*.db` に留まり、外に出ることはありません。
+- **いつでもオプトアウト：** `export DO_NOT_TRACK=1`（[ツール横断の標準](https://consoledonottrack.com)）または `export LEARN_IT_TELEMETRY=0`。CI 実行は自動的に除外されます。匿名 id は `data/.telemetry-id` にあり、削除すればリセットされます。
 
 ## 謝辞
 

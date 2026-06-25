@@ -1,14 +1,47 @@
 # Learn-it
 
-> 一条让知识真正留存的 AI 学习流水线--间隔重复、主动回忆，以及一个无法作弊的掌握度评分。
-
 <!-- README-I18N:START -->
 
-[English](./README.md) | **中文** | [Español](./README.es.md) | [Polski](./README.pl.md) | [日本語](./README.ja.md) | [Deutsch](./README.de.md)
+[English](README.md) | **中文** | [Español](README.es.md) | [Polski](README.pl.md) | [日本語](README.ja.md) | [Deutsch](README.de.md)
 
 <!-- README-I18N:END -->
 
-识别不等于回忆。你看到答案时能认出它，却未必能在没有提示的情况下从记忆中把它调取出来。Learn-it 正是为第二种「知道」而生：它生成个性化的学习路径，再用经过验证的认知科学方法--间隔重复（FSRS）、主动回忆、Feynman 技巧、Bloom 深度，以及 Dreyfus 技能阶梯--驱动你，直到知识真正进入长期记忆。
+<p align="center">
+  <img src="docs/social-preview.png" alt="Learn-it — 无法作弊的掌握度评分" width="800">
+</p>
+
+<p align="center">
+  <em>大多数学习工具奖励你「认出」正确答案。认得不等于想得起。</em><br>
+  <strong>Learn-it 用经过验证的认知科学方法带你练到知识真正留存——掌握度只根据你<em>证明</em>的内容评分，绝不看你的自我声明。</strong><br>
+  <em>本地优先。开源。</em>
+</p>
+
+<p align="center">
+  <a href="https://claude.com/claude-code"><img src="https://img.shields.io/badge/Built_with-Claude_Code-000?style=for-the-badge&logo=anthropic&logoColor=white" alt="Built with Claude Code"></a>
+</p>
+
+---
+
+<p align="center">
+  <img src="docs/diag-teaser.gif" alt="learn-it 逐个概念诊断你，对每个概念评分，并生成关于你当前水平的校准报告" width="800">
+</p>
+
+<p align="center"><strong>间隔重复 · 主动回忆 · 布鲁姆深度 · 德雷福斯阶段 · 无法作弊的掌握度评分</strong></p>
+
+<p align="center">
+  <sub>可由任何符合 agent-skill 标准的 CLI 驱动</sub><br>
+  <img src="https://img.shields.io/badge/Claude_Code-000?style=flat&logo=anthropic&logoColor=white" alt="Claude Code">
+  <img src="https://img.shields.io/badge/OpenCode-111827?style=flat&logo=terminal&logoColor=white" alt="OpenCode">
+  <img src="https://img.shields.io/badge/Qwen_Code-615CED?style=flat" alt="Qwen Code">
+  <img src="https://img.shields.io/badge/Gemini_CLI-4285F4?style=flat&logo=googlegemini&logoColor=white" alt="Gemini CLI">
+  <br>
+  <a href="https://github.com/fn-jakubkarp/learn-it/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/fn-jakubkarp/learn-it/ci.yml?branch=main&label=CI&style=flat" alt="CI status"></a>
+  <a href="https://github.com/fn-jakubkarp/learn-it/releases/latest"><img src="https://img.shields.io/github/v/release/fn-jakubkarp/learn-it?sort=semver&style=flat&color=2ea44f&label=release" alt="Latest release"></a>
+  <img src="https://img.shields.io/github/last-commit/fn-jakubkarp/learn-it?style=flat" alt="Last commit">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue?style=flat" alt="MIT License"></a>
+</p>
+
+你看到答案时能认出它，却未必能在没有提示的情况下从记忆中把它调取出来。Learn-it 正是为第二种「知道」而生：它生成个性化的学习路径，再用经过验证的认知科学方法--间隔重复（FSRS）、主动回忆、Feynman 技巧、Bloom 深度，以及 Dreyfus 技能阶梯--驱动你，直到知识真正进入长期记忆。
 
 它通过 `/learn-it` 技能由 AI 驱动。AI 负责诊断、讲解和评分；一个轻量的 Bun CLI 是它调用的引擎，只记录你实际展示出来的东西。
 
@@ -57,6 +90,31 @@ bun install
 bun src/init-db.ts          # create data/learn_it.db
 bun run verify              # optional: biome + tsc + bun test
 ```
+
+</details>
+
+<details>
+<summary>安装时关闭遥测</summary>
+
+在首次运行**之前**写入退出开关——Bun 会自动加载 `.env`，因此从第一条命令起遥测就处于关闭状态（不显示首次运行提示，也不会生成任何 id）。`.env` 已被 gitignore 忽略。
+
+**Linux / macOS**
+
+```bash
+git clone https://github.com/fn-jakubkarp/learn-it.git && cd learn-it
+echo "LEARN_IT_TELEMETRY=0" > .env
+bun install && bun src/init-db.ts
+```
+
+**Windows (PowerShell)**
+
+```powershell
+git clone https://github.com/fn-jakubkarp/learn-it.git; cd learn-it
+"LEARN_IT_TELEMETRY=0" | Out-File -Encoding ascii .env
+bun install; bun src/init-db.ts
+```
+
+想要系统级开关？`export DO_NOT_TRACK=1` 会让本工具以及任何遵循[该标准](https://consoledonottrack.com)的工具都退出遥测。
 
 </details>
 
@@ -161,8 +219,17 @@ diagnose → conceptualize → recall → space → verify → mastered
 | `src/mastery.ts` | Dreyfus 等级，在概念 + 证据上汇总（数量不计分）。 |
 | `src/init-db.ts` | 创建 / 迁移 SQLite 架构。 |
 | `src/dashboard.ts` | 免构建的本地 Web 仪表盘。 |
+| `src/telemetry.ts` | 匿名、不含内容的使用情况遥测（可退出）。 |
 
 完整设计（含整个流程的图示）参见 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)。
+
+## 遥测
+
+Learn-it 会发送**匿名、不含内容**的使用情况遥测（PostHog），以便根据大家实际使用的命令来改进工具。首次发送任何数据时会打印一条醒目的一次性提示。
+
+- **发送的内容：** 你运行的命令（`grade`、`assess` 等）、应用版本、操作系统，以及一个随机的每次安装 id。仪表盘不会被追踪。
+- **绝不发送的内容：** 科目名、概念名、卡片内容、笔记、分数——任何你学习的东西。这些都留在你机器上的 `data/*.db` 中，绝不外传。
+- **随时退出：** `export DO_NOT_TRACK=1`（[跨工具标准](https://consoledonottrack.com)）或 `export LEARN_IT_TELEMETRY=0`。CI 运行会被自动排除。匿名 id 位于 `data/.telemetry-id`——删除它即可重置。
 
 ## 致谢
 

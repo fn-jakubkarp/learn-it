@@ -42,5 +42,8 @@
 	},
 	"peerDependencies": {
 		"typescript": "^5"
+	},
+	"dependencies": {
+		"posthog-node": "^5.38.5"
 	}
 }

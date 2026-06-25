@@ -46,6 +46,7 @@ import {
 	replayCard,
 	today,
 } from "./scheduler";
+import { trackCommand } from "./telemetry";
 
 // Resolve the DB relative to THIS file, not the caller's cwd — otherwise running
 // from another directory silently CREATEs a fresh empty db there and abandons all
@@ -1330,3 +1331,10 @@ function main() {
 }
 
 main();
+
+// Anonymous adoption telemetry: the command VERB only, never argv (args carry
+// subject/concept names = learning content). trackCommand clamps the verb to the
+// router's allowlist and dispatches off-process (a detached, unref'd child does the
+// network send), so it never delays the command's exit, and the whole thing no-ops
+// unless a real PostHog key is configured.
+trackCommand(command);

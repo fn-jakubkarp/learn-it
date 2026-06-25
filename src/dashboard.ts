@@ -21,6 +21,10 @@ function cli(args: string[]): { ok: boolean; out: string; err: string } {
 		env: {
 			...process.env,
 			LEARN_IT_GRADER: process.env.LEARN_IT_GRADER || "dashboard",
+			// These shell-outs are the dashboard's own plumbing, not user CLI
+			// commands — silence their telemetry so we neither double-count nor
+			// spawn a sender per poll. The dashboard reports its own use below.
+			LEARN_IT_TELEMETRY: "0",
 		},
 	});
 	return {
@@ -43,10 +47,15 @@ const serveOptions = {
 		const url = new URL(req.url);
 		const { pathname } = url;
 
-		if (req.method === "GET" && pathname === "/")
-			return new Response(fs.readFileSync(HTML), {
+		if (req.method === "GET" && pathname === "/") {
+			// The dashboard itself is not tracked — telemetry is CLI-only. Its
+			// shell-outs run with LEARN_IT_TELEMETRY=0 (see cli() above), so opening
+			// the web UI emits nothing and never touches learning content in the DOM.
+			const html = fs.readFileSync(HTML, "utf8");
+			return new Response(html, {
 				headers: { "content-type": "text/html; charset=utf-8" },
 			});
+		}
 
 		// Live watcher + card state for the whole learner.
 		if (req.method === "GET" && pathname === "/api/state") {
