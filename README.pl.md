@@ -221,7 +221,7 @@ Jedyna zasada: silnik zapisuje *Stan*, czyta *Wiedzę* i nigdy nie edytuje pliku
 | `src/dashboard.ts` | Lokalny pulpit webowy bez budowania. |
 | `src/telemetry.ts` | Anonimowa, pozbawiona treści telemetria użycia (opt-out). |
 
-Pełny projekt — wraz z diagramem całego przepływu — znajdziesz w [`docs/ARCHITECTURE.md`](./ARCHITECTURE.md).
+Pełny projekt — wraz z diagramem całego przepływu — znajdziesz w [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ## Telemetria
 

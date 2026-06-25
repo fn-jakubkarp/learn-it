@@ -221,7 +221,7 @@ diagnose → conceptualize → recall → space → verify → mastered
 | `src/dashboard.ts` | 免构建的本地 Web 仪表盘。 |
 | `src/telemetry.ts` | 匿名、不含内容的使用情况遥测（可退出）。 |
 
-完整设计（含整个流程的图示）参见 [`docs/ARCHITECTURE.md`](./ARCHITECTURE.md)。
+完整设计（含整个流程的图示）参见 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)。
 
 ## 遥测
 

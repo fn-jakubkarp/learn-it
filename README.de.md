@@ -221,7 +221,7 @@ Die eine Regel: Die Engine schreibt den *Zustand*, liest das *Wissen* und bearbe
 | `src/dashboard.ts` | Build-freies lokales Web-Dashboard. |
 | `src/telemetry.ts` | Anonyme, inhaltsfreie Nutzungstelemetrie (Opt-out). |
 
-Das vollständige Design — samt einem Diagramm des gesamten Ablaufs — findest du in [`docs/ARCHITECTURE.md`](./ARCHITECTURE.md).
+Das vollständige Design — samt einem Diagramm des gesamten Ablaufs — findest du in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ## Telemetrie
 

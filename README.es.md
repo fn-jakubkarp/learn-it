@@ -221,7 +221,7 @@ La única regla: el motor escribe el *Estado*, lee el *Conocimiento* y nunca edi
 | `src/dashboard.ts` | Panel web local sin compilación. |
 | `src/telemetry.ts` | Telemetría de uso anónima y sin contenido (opt-out). |
 
-Consulta [`docs/ARCHITECTURE.md`](./ARCHITECTURE.md) para el diseño completo, incluido un diagrama de todo el flujo.
+Consulta [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) para el diseño completo, incluido un diagrama de todo el flujo.
 
 ## Telemetría
 

@@ -221,7 +221,7 @@ diagnose → conceptualize → recall → space → verify → mastered
 | `src/dashboard.ts` | ビルド不要のローカル Web ダッシュボード。 |
 | `src/telemetry.ts` | 匿名・内容を含まない利用テレメトリ（オプトアウト可）。 |
 
-全体の流れを示す図を含む完全な設計は [`docs/ARCHITECTURE.md`](./ARCHITECTURE.md) を参照してください。
+全体の流れを示す図を含む完全な設計は [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) を参照してください。
 
 ## テレメトリ
 
