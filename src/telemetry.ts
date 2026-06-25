@@ -177,7 +177,9 @@ const TRACKED_COMMANDS = new Set([
 // Clamp any input to an allowlisted verb: a missing command is the router's
 // "resume" default; anything unrecognized (a typo, or a stray subject/concept name
 // from a malformed invocation) becomes "unknown" so no user-typed string leaks.
-function trackedVerb(command: string | undefined): string {
+// Exported so tests can pin the privacy boundary — an off-allowlist string MUST
+// never ride out as itself.
+export function trackedVerb(command: string | undefined): string {
 	if (command === undefined) return "resume";
 	return TRACKED_COMMANDS.has(command) ? command : "unknown";
 }

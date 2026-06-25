@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { isTelemetryDisabled } from "../src/telemetry";
+import { isTelemetryDisabled, trackedVerb } from "../src/telemetry";
 
 // The opt-out matrix is the whole privacy contract — assert it directly so a
 // refactor can't silently flip telemetry on where it should be off. A non-empty
@@ -50,5 +50,26 @@ describe("isTelemetryDisabled — opt-out matrix", () => {
 		expect(isTelemetryDisabled({ DO_NOT_TRACK: " FALSE " }, REAL_KEY)).toBe(
 			false,
 		);
+	});
+});
+
+describe("trackedVerb — egress allowlist", () => {
+	test("an allowlisted verb passes through unchanged", () => {
+		expect(trackedVerb("grade")).toBe("grade");
+		expect(trackedVerb("export")).toBe("export");
+	});
+
+	test("a missing command is the router's resume default", () => {
+		expect(trackedVerb(undefined)).toBe("resume");
+	});
+
+	test("any off-allowlist string is clamped to 'unknown' — never leaks", () => {
+		// This is the privacy boundary: a stray subject/concept name from a
+		// malformed invocation, a typo, or a directly-invoked sender must NOT ride
+		// out as itself.
+		expect(trackedVerb("my-secret-subject")).toBe("unknown");
+		expect(trackedVerb("rm -rf")).toBe("unknown");
+		expect(trackedVerb("")).toBe("unknown");
+		expect(trackedVerb("GRADE")).toBe("unknown"); // case-sensitive — not a verb
 	});
 });
