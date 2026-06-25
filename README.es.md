@@ -1,18 +1,47 @@
 # Learn-it
 
-> Un pipeline de aprendizaje con IA que construye conocimiento duradero: repetición espaciada, recuerdo activo y una puntuación de dominio que no puedes falsear.
-
 <!-- README-I18N:START -->
 
-[English](../README.md) | [中文](./README.zh.md) | **Español** | [Polski](./README.pl.md) | [日本語](./README.ja.md) | [Deutsch](./README.de.md)
+[English](README.md) | [中文](README.zh.md) | **Español** | [Polski](README.pl.md) | [日本語](README.ja.md) | [Deutsch](README.de.md)
 
 <!-- README-I18N:END -->
 
 <p align="center">
-  <img src="diag-teaser.gif" alt="learn-it te diagnostica concepto por concepto, califica cada uno y escribe un informe calibrado de dónde te encuentras" width="820">
+  <img src="docs/social-preview.png" alt="Learn-it — una puntuación de dominio que no puedes falsear" width="800">
 </p>
 
-Reconocer no es recordar. Puedes reconocer una respuesta cuando la ves y, aun así, no ser capaz de recuperarla de la memoria sin pistas. Learn-it está hecho para el segundo tipo de saber: genera una ruta de aprendizaje personalizada y luego te guía a través de métodos probados de la ciencia cognitiva -repetición espaciada (FSRS), recuerdo activo, Feynman, profundidad de Bloom y la escalera de habilidad de Dreyfus- hasta que el conocimiento realmente se asienta en la memoria a largo plazo.
+<p align="center">
+  <em>La mayoría de las apps de estudio te premian por reconocer la respuesta correcta. Reconocer no es recordar.</em><br>
+  <strong>Learn-it te guía por métodos probados de la ciencia cognitiva hasta que el conocimiento se fija — y puntúa el dominio por lo que <em>demuestras</em>, nunca por lo que afirmas.</strong><br>
+  <em>Local-first. Código abierto.</em>
+</p>
+
+<p align="center">
+  <a href="https://claude.com/claude-code"><img src="https://img.shields.io/badge/Built_with-Claude_Code-000?style=for-the-badge&logo=anthropic&logoColor=white" alt="Built with Claude Code"></a>
+</p>
+
+---
+
+<p align="center">
+  <img src="docs/diag-teaser.gif" alt="learn-it te diagnostica concepto por concepto, califica cada uno y escribe un informe calibrado de dónde te encuentras" width="800">
+</p>
+
+<p align="center"><strong>Repetición espaciada · Recuerdo activo · Profundidad de Bloom · Niveles de Dreyfus · Una puntuación de dominio que no puedes amañar</strong></p>
+
+<p align="center">
+  <sub>Funciona con cualquier CLI compatible con el estándar agent-skill</sub><br>
+  <img src="https://img.shields.io/badge/Claude_Code-000?style=flat&logo=anthropic&logoColor=white" alt="Claude Code">
+  <img src="https://img.shields.io/badge/OpenCode-111827?style=flat&logo=terminal&logoColor=white" alt="OpenCode">
+  <img src="https://img.shields.io/badge/Qwen_Code-615CED?style=flat" alt="Qwen Code">
+  <img src="https://img.shields.io/badge/Gemini_CLI-4285F4?style=flat&logo=googlegemini&logoColor=white" alt="Gemini CLI">
+  <br>
+  <a href="https://github.com/fn-jakubkarp/learn-it/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/fn-jakubkarp/learn-it/ci.yml?branch=main&label=CI&style=flat" alt="CI status"></a>
+  <a href="https://github.com/fn-jakubkarp/learn-it/releases/latest"><img src="https://img.shields.io/github/v/release/fn-jakubkarp/learn-it?sort=semver&style=flat&color=2ea44f&label=release" alt="Latest release"></a>
+  <img src="https://img.shields.io/github/last-commit/fn-jakubkarp/learn-it?style=flat" alt="Last commit">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue?style=flat" alt="MIT License"></a>
+</p>
+
+Puedes reconocer una respuesta cuando la ves y, aun así, no ser capaz de recuperarla de la memoria sin pistas. Learn-it está hecho para el segundo tipo de saber: genera una ruta de aprendizaje personalizada y luego te guía a través de métodos probados de la ciencia cognitiva -repetición espaciada (FSRS), recuerdo activo, Feynman, profundidad de Bloom y la escalera de habilidad de Dreyfus- hasta que el conocimiento realmente se asienta en la memoria a largo plazo.
 
 Lo dirige una IA mediante la habilidad `/learn-it`. La IA te diagnostica, te enseña y te califica; una CLI ligera en Bun es el motor que invoca y solo registra lo que de verdad demuestras.
 

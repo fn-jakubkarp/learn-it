@@ -1,18 +1,47 @@
 # Learn-it
 
-> An AI learning pipeline that builds knowledge that lasts: spaced repetition, active recall, and a mastery score you can't fake.
-
 <!-- README-I18N:START -->
 
-**English** | [中文](./docs/README.zh.md) | [Español](./docs/README.es.md) | [Polski](./docs/README.pl.md) | [日本語](./docs/README.ja.md) | [Deutsch](./docs/README.de.md)
+**English** | [中文](README.zh.md) | [Español](README.es.md) | [Polski](README.pl.md) | [日本語](README.ja.md) | [Deutsch](README.de.md)
 
 <!-- README-I18N:END -->
 
 <p align="center">
-  <img src="docs/diag-teaser.gif" alt="learn-it diagnoses you concept by concept, grades each, and writes a calibrated readout of where you stand" width="820">
+  <img src="docs/social-preview.png" alt="Learn-it — score mastery you can't fake" width="800">
 </p>
 
-Recognition isn't recall. You can recognize an answer when you see it and still not be able to pull it from memory unprompted. Learn-it is built for the second kind of knowing: it generates a personalized learning path, then drives you through proven cognitive-science methods, from spaced repetition (FSRS) and active recall to Feynman, Bloom depth, and the Dreyfus skill ladder, until knowledge actually lands in long-term memory.
+<p align="center">
+  <em>Most study tools reward you for recognizing the right answer. Recognition isn't recall.</em><br>
+  <strong>Learn-it drives you through proven cognitive-science methods until knowledge sticks — and scores mastery from what you <em>prove</em>, never what you claim.</strong><br>
+  <em>Local-first. Open source.</em>
+</p>
+
+<p align="center">
+  <a href="https://claude.com/claude-code"><img src="https://img.shields.io/badge/Built_with-Claude_Code-000?style=for-the-badge&logo=anthropic&logoColor=white" alt="Built with Claude Code"></a>
+</p>
+
+---
+
+<p align="center">
+  <img src="docs/diag-teaser.gif" alt="learn-it diagnoses you concept by concept, grades each, and writes a calibrated readout of where you stand" width="800">
+</p>
+
+<p align="center"><strong>Spaced repetition · Active recall · Bloom depth · Dreyfus tiers · A mastery score you can't game</strong></p>
+
+<p align="center">
+  <sub>Driven by any agent-skill-standard CLI</sub><br>
+  <img src="https://img.shields.io/badge/Claude_Code-000?style=flat&logo=anthropic&logoColor=white" alt="Claude Code">
+  <img src="https://img.shields.io/badge/OpenCode-111827?style=flat&logo=terminal&logoColor=white" alt="OpenCode">
+  <img src="https://img.shields.io/badge/Qwen_Code-615CED?style=flat" alt="Qwen Code">
+  <img src="https://img.shields.io/badge/Gemini_CLI-4285F4?style=flat&logo=googlegemini&logoColor=white" alt="Gemini CLI">
+  <br>
+  <a href="https://github.com/fn-jakubkarp/learn-it/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/fn-jakubkarp/learn-it/ci.yml?branch=main&label=CI&style=flat" alt="CI status"></a>
+  <a href="https://github.com/fn-jakubkarp/learn-it/releases/latest"><img src="https://img.shields.io/github/v/release/fn-jakubkarp/learn-it?sort=semver&style=flat&color=2ea44f&label=release" alt="Latest release"></a>
+  <img src="https://img.shields.io/github/last-commit/fn-jakubkarp/learn-it?style=flat" alt="Last commit">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue?style=flat" alt="MIT License"></a>
+</p>
+
+You can recognize an answer when you see it and still not be able to pull it from memory unprompted. Learn-it is built for the second kind of knowing: it generates a personalized learning path, then drives you through proven cognitive-science methods, from spaced repetition (FSRS) and active recall to Feynman, Bloom depth, and the Dreyfus skill ladder, until knowledge actually lands in long-term memory.
 
 It's driven by an AI through the `/learn-it` skill. The AI diagnoses you, teaches, and grades; a thin Bun CLI is the engine it calls, logging only what you demonstrate.
 

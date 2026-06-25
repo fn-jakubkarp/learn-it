@@ -1,18 +1,47 @@
 # Learn-it
 
-> Potok nauki oparty na AI, który buduje trwałą wiedzę - powtórki rozłożone w czasie, aktywne przypominanie i wynik biegłości, którego nie da się sfałszować.
-
 <!-- README-I18N:START -->
 
-[English](../README.md) | [中文](./README.zh.md) | [Español](./README.es.md) | **Polski** | [日本語](./README.ja.md) | [Deutsch](./README.de.md)
+[English](README.md) | [中文](README.zh.md) | [Español](README.es.md) | **Polski** | [日本語](README.ja.md) | [Deutsch](README.de.md)
 
 <!-- README-I18N:END -->
 
 <p align="center">
-  <img src="diag-teaser.gif" alt="learn-it diagnozuje cię koncept po koncepcie, ocenia każdy z nich i zapisuje skalibrowany raport o tym, na jakim jesteś poziomie" width="820">
+  <img src="docs/social-preview.png" alt="Learn-it — wynik biegłości, którego nie sfałszujesz" width="800">
 </p>
 
-Rozpoznanie to nie to samo co przypomnienie. Możesz rozpoznać odpowiedź, gdy ją widzisz, a mimo to nie potrafić wydobyć jej z pamięci bez podpowiedzi. Learn-it jest stworzony dla tego drugiego rodzaju wiedzy: generuje spersonalizowaną ścieżkę nauki, a następnie prowadzi cię przez sprawdzone metody z nauk kognitywnych - powtórki rozłożone w czasie (FSRS), aktywne przypominanie, technikę Feynmana, głębię taksonomii Blooma i drabinę umiejętności Dreyfusa - aż wiedza naprawdę osiądzie w pamięci długotrwałej.
+<p align="center">
+  <em>Większość narzędzi do nauki nagradza cię za rozpoznanie poprawnej odpowiedzi. Rozpoznanie to nie przypomnienie.</em><br>
+  <strong>Learn-it prowadzi cię przez sprawdzone metody nauk kognitywnych, aż wiedza osiądzie — i ocenia biegłość na podstawie tego, co <em>udowodnisz</em>, nigdy tego, co zadeklarujesz.</strong><br>
+  <em>Local-first. Otwarte źródło.</em>
+</p>
+
+<p align="center">
+  <a href="https://claude.com/claude-code"><img src="https://img.shields.io/badge/Built_with-Claude_Code-000?style=for-the-badge&logo=anthropic&logoColor=white" alt="Built with Claude Code"></a>
+</p>
+
+---
+
+<p align="center">
+  <img src="docs/diag-teaser.gif" alt="learn-it diagnozuje cię koncept po koncepcie, ocenia każdy z nich i zapisuje skalibrowany raport o tym, na jakim jesteś poziomie" width="800">
+</p>
+
+<p align="center"><strong>Powtórki rozłożone w czasie · Aktywne przypominanie · Głębia Blooma · Poziomy Dreyfusa · Wynik biegłości, którego nie oszukasz</strong></p>
+
+<p align="center">
+  <sub>Sterowane przez dowolne CLI zgodne ze standardem agent-skill</sub><br>
+  <img src="https://img.shields.io/badge/Claude_Code-000?style=flat&logo=anthropic&logoColor=white" alt="Claude Code">
+  <img src="https://img.shields.io/badge/OpenCode-111827?style=flat&logo=terminal&logoColor=white" alt="OpenCode">
+  <img src="https://img.shields.io/badge/Qwen_Code-615CED?style=flat" alt="Qwen Code">
+  <img src="https://img.shields.io/badge/Gemini_CLI-4285F4?style=flat&logo=googlegemini&logoColor=white" alt="Gemini CLI">
+  <br>
+  <a href="https://github.com/fn-jakubkarp/learn-it/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/fn-jakubkarp/learn-it/ci.yml?branch=main&label=CI&style=flat" alt="CI status"></a>
+  <a href="https://github.com/fn-jakubkarp/learn-it/releases/latest"><img src="https://img.shields.io/github/v/release/fn-jakubkarp/learn-it?sort=semver&style=flat&color=2ea44f&label=release" alt="Latest release"></a>
+  <img src="https://img.shields.io/github/last-commit/fn-jakubkarp/learn-it?style=flat" alt="Last commit">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue?style=flat" alt="MIT License"></a>
+</p>
+
+Możesz rozpoznać odpowiedź, gdy ją widzisz, a mimo to nie potrafić wydobyć jej z pamięci bez podpowiedzi. Learn-it jest stworzony dla tego drugiego rodzaju wiedzy: generuje spersonalizowaną ścieżkę nauki, a następnie prowadzi cię przez sprawdzone metody z nauk kognitywnych - powtórki rozłożone w czasie (FSRS), aktywne przypominanie, technikę Feynmana, głębię taksonomii Blooma i drabinę umiejętności Dreyfusa - aż wiedza naprawdę osiądzie w pamięci długotrwałej.
 
 Steruje nim AI poprzez umiejętność `/learn-it`. AI diagnozuje cię, uczy i ocenia; lekkie CLI w Bun jest silnikiem, który wywołuje, zapisując tylko to, co faktycznie wykażesz.
 
